@@ -3,7 +3,7 @@
 import "./globals.css";                 // bring in all global styles
 
 import { Plus_Jakarta_Sans } from "next/font/google"; // Google font helper
-import Navbar from "../components/Navbar";            // top navigation bar
+import NavBar from "../components/NavBar";            // top navigation bar
 import Footer from "../components/Footer";            // bottom footer
 
 // Load Plus Jakarta and store it as a CSS variable we can use in CSS
@@ -40,7 +40,7 @@ export default function RootLayout({ children }) {
         className={`${jakarta.variable} bg-black text-white min-h-screen selection:bg-white selection:text-black`}
       >
         {/* Navbar always at the top */}
-        <Navbar />
+        <NavBar />
 
         {/* Main content; leave vertical space so footer sits at bottom */}
         <main className="min-h-[calc(100vh-160px)]">
