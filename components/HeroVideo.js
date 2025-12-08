@@ -1,57 +1,57 @@
 // components/HeroVideo.js
 "use client";
-import { useState } from "react";
+
+import Link from "next/link";
 import Image from "next/image";
 
 export default function HeroVideo() {
-  const [ready, setReady] = useState(false);
-
   return (
-    <section className="relative h-[100svh] w-full overflow-hidden pb-24">
-      {/* Video */}
+    <section className="relative w-full vh overflow-hidden rounded-b-2xl">
+      {/* Background video */}
       <video
-        className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-500 ${ready ? "opacity-100" : "opacity-0"}`}
-        src="/hero.mp4"
-        muted
-        playsInline
+        className="absolute inset-0 w-full h-full object-cover"
+        src="/hero.mp4"        // place your hero.mp4 in /public
         autoPlay
         loop
+        muted
+        playsInline
         preload="metadata"
-        onCanPlay={() => setReady(true)}
+        poster="/hero-poster.jpg" // optional static preview
       />
 
-      {/* Subtle gradient overlay for readability */}
-      <div className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-b
-                from-black/50 via-black/35 to-black/80" />
+      {/* Dark overlay for readability */}
+      <div className="absolute inset-0 bg-black/60" />
 
-      {/* content */}
-<div className="relative z-10 flex h-full w-full items-center justify-center">
-  <div className="mx-auto max-w-4xl px-4 text-center">
-    {/* Logo mark with quiet confidence */}
-<Image
-  src="/nivimc-logo.png"
-  alt="NIVIMC"
-  width={200}
-  height={190}
-  className="brand-mark mx-auto mb-8 fade-in drop-shadow-[0_2px_8px_rgba(255,255,255,0.15)]"
-/>
+      {/* Foreground content */}
+      <div className="relative h-full flex flex-col items-center justify-center text-center px-6">
+        {/* Logo mark */}
+        <Image
+          src="/logo-nivimc.png"
+          alt="NIVIMC"
+          width={96}
+          height={96}
+          priority
+          className="brand-mark"
+        />
 
-    {/* Headline */}
-    <h1 className="h1 text-shadow-sm fade-in-200">
-      Precision. Purpose. Presence.
-    </h1>
+        {/* Main headline */}
+        <h1 className="h1 mt-6 fade-in">
+          NIVIMC
+        </h1>
 
-    {/* Support line with slight delay so it feels considered */}
-    <p className="jakarta mt-4 text-neutral-300 fade-in-400">
-      We design digital systems that speak quietly and work relentlessly.
-    </p>
+        {/* Subtext */}
+        <p className="p max-w-lg mt-3 text-neutral-300 fade-in-200">
+          Web design and code for brands that want silence, speed, and precision.
+        </p>
 
-{/* Buttons */}
-<div className="jakarta mt-12 cta-row flex items-center justify-center px-4">
-  <a href="/home" className="btn btn-primary">Experience the Studio</a>
-  <a href="/portfolio" className="btn btn-ghost">See What We’ve Made</a>
-</div>
-
+        {/* CTA buttons */}
+        <div className="cta-row mt-10 fade-in-400">
+          <Link href="/portfolio" className="btn">
+            View Work
+          </Link>
+          <Link href="/services" className="btn btn-ghost">
+            Services
+          </Link>
         </div>
       </div>
     </section>
