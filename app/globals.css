@@ -1,178 +1,159 @@
+/* Tailwind base/utilities (keep at the top) */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Hard floor: full-height and black canvas */
-html, body, #__next {
+/* -------------------------------------------------------
+   Core theme: black canvas, white type, mobile-first
+--------------------------------------------------------*/
+:root {               /* Design tokens */
+  --bg: #000;         /* Background */
+  --fg: #fff;         /* Foreground text */
+  --muted: #cfcfcf;   /* Secondary text */
+}
+
+html, body {          /* Full-height page with clean baseline */
   height: 100%;
-  background: #000 !important;
-  color: #fff; /* fallback if Tailwind classes miss */
   margin: 0;
   padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+  -webkit-text-size-adjust: 100%;  /* Stop iOS from random zoom */
+  text-rendering: optimizeLegibility;
 }
 
+/* Safe-area padding for notches (paired with viewportFit:cover) */
+body {
+  padding-left: max(0px, env(safe-area-inset-left));
+  padding-right: max(0px, env(safe-area-inset-right));
+}
 
-/* Luxe typography helpers (no @apply; plain CSS) */
-.h1 { font-weight: 600; letter-spacing: -0.02em; font-size: clamp(2.5rem, 6vw, 4.5rem); }
-.h2 { font-weight: 600; letter-spacing: -0.02em; font-size: clamp(1.875rem, 4vw, 3rem); }
+/* Container helper: centered + safe padding */
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
 
-/* Luxury minimalist heading refinement */
+/* Media should never overflow the viewport */
+img, video, canvas, svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+/* Full-bleed hero height that behaves on mobile URL bars */
+.vh {
+  min-height: 88vh;         /* Default: slightly under full screen */
+}
+@supports (min-height: 100svh) {
+  .vh { min-height: 95svh; } /* Small viewport height on modern mobile */
+}
+
+/* -------------------------------------------------------
+   Typography: one source of truth (removed duplicates)
+--------------------------------------------------------*/
 h1, .h1 {
-  color: #f5f5f5;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  font-family: "Playfair Display", serif; /* or Canela if you have it */
-  text-shadow: 0 2px 8px rgba(0,0,0,0.8);
-  transition: color 0.3s ease;
-}
-
-p, .p {
-  color: #b8b8b8;
-  font-weight: 300;
-  line-height: 1.7;
-}
-
-.p  { color: #cfcfcf; line-height: 1.7; font-size: clamp(1rem, 1.6vw, 1.125rem); }
-
-.hr { border-top: 1px solid rgba(255,255,255,.1); }
-.btn {
-  display: inline-flex; align-items: center; justify-content: center;
-  padding: .75rem 1.5rem; border-radius: 9999px;
-  border: 1px solid rgba(255,255,255,.3); color: #fff;
-  transition: border-color .2s ease;
-}
-.btn:hover { border-color: rgba(255,255,255,.6); }
-.btn-ghost { border-color: rgba(255,255,255,.1); }
-.btn-ghost:hover { border-color: rgba(255,255,255,.4); }
-
-.page-enter { animation: fadeIn 600ms ease both; }
-@keyframes glowPulse {
-  0%, 100% { text-shadow: 0 2px 6px rgba(0,0,0,0.7); }
-  50% { text-shadow: 0 2px 12px rgba(0,0,0,0.9); }
-}
-
-.text-glow {
-  animation: glowPulse 4s ease-in-out infinite;
-}
-
-.fade-in {
-  opacity: 0;
-  transform: translateY(10px);
-  animation: fadeIn 1.6s ease forwards;
-}
-
-.fade-in.delay-200 {
-  animation-delay: 0.2s;
-}
-.fade-in.delay-400 {
-  animation-delay: 0.4s;
-}
-
-@keyframes fadeIn {
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* ---- Brand font helpers ---- */
-.font-serif-brand { font-family: var(--font-serif), ui-serif, serif; }
-.font-sans-brand  { font-family: var(--font-sans), ui-sans-serif, system-ui; }
-
-.jakarta {
-  font-family: var(--font-jakarta), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-}
-
-/* Headline utility (used by your h1) */
-.h1{
-  font-family: var(--font-jakarta), system-ui, -apple-system, Segoe UI, sans-serif;
+  font-family: var(--font-jakarta, ui-sans-serif), system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
   font-weight: 700;
   letter-spacing: -0.02em;
-  font-size: clamp(2.6rem, 6vw, 4.8rem);
+  font-size: clamp(2rem, 6vw, 4.5rem);
   line-height: 1.05;
   color: #fff;
   text-shadow: 0 2px 6px rgba(0,0,0,.7);
 }
 
+h2, .h2 {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-size: clamp(1.5rem, 4vw, 3rem);
+  line-height: 1.1;
+  color: #f5f5f5;
+}
 
-/* Body copy */
-.p { font-family: var(--font-sans); color: #cfcfcf; line-height: 1.65; }
+p, .p {
+  font-family: var(--font-sans, ui-sans-serif), system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  color: var(--muted);
+  font-weight: 300;
+  line-height: 1.7;
+  font-size: clamp(0.95rem, 1.6vw, 1.125rem);
+}
 
-/* ---- Buttons: pill, hairline, neon-cyan hover ---- */
+/* -------------------------------------------------------
+   Buttons: pill, touch-friendly, no overflow
+--------------------------------------------------------*/
 .btn {
-  display:inline-flex; align-items:center; justify-content:center;
-  padding:.75rem 1.25rem; border-radius: 9999px;
-  border: 1px solid rgba(255,255,255,.22);
-  font-family: var(--font-sans);
-  transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
-  will-change: transform;
-}
-.btn:hover { border-color: rgba(255,255,255,.55); transform: translateY(-1px); }
-.btn-primary:hover { box-shadow: 0 0 0 6px rgba(0,207,255,.10), 0 0 32px rgba(0,207,255,.28); }
-.btn-ghost { border-color: rgba(255,255,255,.12); }
-.btn-ghost:hover { border-color: rgba(255,255,255,.36); }
-
-/* Small stagger helpers for fade-in */
-.fade-in { animation: fadeIn .6s ease both; }
-.fade-in.delay-200 { animation-delay: .2s; }
-.fade-in.delay-400 { animation-delay: .4s; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: translateY(0) } }
-
-/* ——— NIVIMC polish ——— */
-
-/* Logo mark: present, not shouting */
-.brand-mark {
-  opacity: .88;
-  transition: opacity .25s ease, filter .25s ease, transform .25s ease;
-  filter: drop-shadow(0 2px 8px rgba(0,0,0,.35));
-}
-.brand-mark:hover { opacity: 1; filter: drop-shadow(0 3px 14px rgba(0,0,0,.45)); }
-
-/* Headline letterfit + subtle weight */
-.h1 {
-  letter-spacing: -0.02em; /* tighter, bespoke */
-  font-weight: 650;        /* reads like cut metal */
-}
-
-/* Fades that feel intentional, not bouncy */
-@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-
-.fade-in        { animation: fadeIn .7s ease both; }
-.fade-in-200    { animation: fadeIn .7s ease .2s both; }
-.fade-in-400    { animation: fadeIn .7s ease .4s both; }
-.fade-in-600    { animation: fadeIn .7s ease .6s both; }
-
-/* Ghost + solid buttons with micro-interaction */
-.btn {
-  display: inline-flex; align-items: center; justify-content: center;
-  padding: .8rem 1.35rem; border-radius: 999px;
-  border: 1px solid rgba(255,255,255,.16);
-  color: #fff; background: rgba(255,255,255,.04);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: .75rem 1.25rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255,255,255,.18);
+  color: #fff;
+  background: rgba(255,255,255,.04);
   backdrop-filter: blur(6px);
-  transition: transform .15s ease, border-color .2s ease, background .2s ease;
+  transition: transform .15s ease, border-color .2s ease, background .2s ease, box-shadow .2s ease;
+  min-height: 44px;          /* Tap target */
+  width: 100%;               /* Mobile default: full-width */
+  max-width: 20rem;          /* But never ridiculous */
+}
+@media (min-width: 480px) {
+  .btn { width: auto; }      /* On larger screens, shrink to content */
 }
 .btn:hover {
+  border-color: rgba(255,255,255,.36);
   box-shadow: 0 0 16px rgba(255,255,255,0.06);
   transform: translateY(-2px);
-  transition: all 0.3s ease;
 }
-
 .btn-ghost {
-  background: transparent; border-color: rgba(255,255,255,.16); color: #eaeaea;
+  background: transparent;
+  border-color: rgba(255,255,255,.14);
+  color: #eaeaea;
 }
-.btn-ghost:hover { color: #fff; border-color: rgba(255,255,255,.28); }
+.btn-ghost:hover {
+  color: #fff;
+  border-color: rgba(255,255,255,.28);
+}
 
-/* Optional: keep headline readable on complex frames */
-.text-shadow-sm { text-shadow: 0 2px 6px rgba(0,0,0,.7); }
+/* CTA rows use gap, not chained margins (prevents sideways scroll) */
+.cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;               /* Space between buttons on mobile */
+}
+@media (min-width: 640px) {
+  .cta-row { gap: 1.25rem; } /* More space on bigger screens */
+}
 
-/* Keep CTAs elegantly apart, responsive */
-.cta-row .btn + .btn { margin-left: 2.5rem; }           /* 40px */
-@media (min-width: 640px){ .cta-row .btn + .btn { margin-left: 3rem; } }
-@media (min-width: 1024px){ .cta-row .btn + .btn { margin-left: 4rem; } }
-.btn { min-width: 14rem; }
+/* -------------------------------------------------------
+   Lines, animations, polish
+--------------------------------------------------------*/
+.hr { border-top: 1px solid rgba(255,255,255,.1); }
 
+.brand-mark {
+  opacity: .88;
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,.35));
+  transition: opacity .25s ease, filter .25s ease, transform .25s ease;
+}
+.brand-mark:hover {
+  opacity: 1;
+  filter: drop-shadow(0 3px 14px rgba(0,0,0,.45));
+}
+
+/* Subtle entrance animations; reduced for motion-sensitive users */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+.fade-in      { animation: fadeIn .7s ease both; }
+.fade-in-200  { animation: fadeIn .7s ease .2s both; }
+.fade-in-400  { animation: fadeIn .7s ease .4s both; }
+.fade-in-600  { animation: fadeIn .7s ease .6s both; }
+@media (prefers-reduced-motion: reduce) {
+  .fade-in, .fade-in-200, .fade-in-400, .fade-in-600 { animation: none; }
+}
+
+/* Footer tone */
 footer {
-  font-family: var(--font-sans);
+  font-family: var(--font-sans, ui-sans-serif);
   font-weight: 500;
   letter-spacing: 0.025em;
 }
