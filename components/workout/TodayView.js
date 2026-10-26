@@ -5,6 +5,7 @@ import styles from "./workout.module.css";
 import SetTable, { toggleSet } from "./SetTable";
 import HowTo from "./HowTo";
 import ExercisePicker from "./ExercisePicker";
+import MuscleMap, { MapLegend } from "./MuscleMap";
 import { EXERCISE_BY_ID, groupLabel } from "@/lib/workout/exercises";
 import {
   DAY_NAMES,
@@ -18,8 +19,9 @@ import {
   weekdayOf,
 } from "@/lib/workout/program";
 import { lastPerformance, newSet, viewDay, withDay } from "@/lib/workout/log";
+import { musclesFor } from "@/lib/workout/muscles";
 
-export default function TodayView({ state, update, dateKey, setDateKey, todayKey }) {
+export default function TodayView({ state, update, dateKey, setDateKey, todayKey, onSetDone }) {
   const [picker, setPicker] = useState(null); // { mode: "add" } | { mode: "swap", index, group }
   const day = viewDay(state, dateKey);
   const weekday = weekdayOf(dateKey);
@@ -53,7 +55,11 @@ export default function TodayView({ state, update, dateKey, setDateKey, todayKey
         </button>
       )}
 
-      <SquatBlock state={state} day={day} dateKey={dateKey} edit={edit} />
+      <div style={{ marginBottom: 10 }}>
+        <MapLegend />
+      </div>
+
+      <SquatBlock state={state} day={day} dateKey={dateKey} edit={edit} onSetDone={onSetDone} />
 
       {day.exercises.length === 0 && (
         <div className={`${styles.card} ${styles.empty}`}>
@@ -70,6 +76,7 @@ export default function TodayView({ state, update, dateKey, setDateKey, todayKey
           last={lastPerformance(state.logs, ex.exId, dateKey)}
           edit={edit}
           onSwap={() => setPicker({ mode: "swap", index, group: EXERCISE_BY_ID[ex.exId]?.group })}
+          onSetDone={onSetDone}
         />
       ))}
 
@@ -118,7 +125,7 @@ export default function TodayView({ state, update, dateKey, setDateKey, todayKey
 
 // ---------------------------------------------------------------- Squat
 
-function SquatBlock({ state, day, dateKey, edit }) {
+function SquatBlock({ state, day, dateKey, edit, onSetDone }) {
   const { settings, logs } = state;
   const units = settings.units;
   const squat = day.squat;
@@ -141,16 +148,17 @@ function SquatBlock({ state, day, dateKey, edit }) {
 
   return (
     <section className={`${styles.card} ${styles.squatCard}`}>
-      <div className={`${styles.row} ${styles.between}`}>
-        <div>
+      <div className={styles.cardHead}>
+        <div className={styles.grow}>
           <div className={styles.label}>Every day · Cory Gregory style</div>
           <h3 className={styles.h3}>Back Squat</h3>
           <div className={styles.muscles}>{ex.muscles}</div>
+          <label className={styles.toggle} style={{ marginTop: 8 }}>
+            <input type="checkbox" checked={isLight} onChange={(e) => edit((d) => (d.squat.light = e.target.checked))} />
+            Light / recovery day
+          </label>
         </div>
-        <label className={styles.toggle}>
-          <input type="checkbox" checked={isLight} onChange={(e) => edit((d) => (d.squat.light = e.target.checked))} />
-          Light / recovery day
-        </label>
+        <MuscleMap {...musclesFor(SQUAT_EXERCISE_ID)} size="sm" />
       </div>
 
       {!isLight && (
@@ -237,7 +245,10 @@ function SquatBlock({ state, day, dateKey, edit }) {
         units={units}
         placeholder={() => ({ weight: workWeight, reps: workReps })}
         onChange={(i, field, value) => writeSet(i, (s) => ({ ...s, [field]: value }))}
-        onToggle={(i, ph) => writeSet(i, (s) => toggleSet(s, ph))}
+        onToggle={(i, ph) => {
+          if (!sets[i].done) onSetDone?.(state.settings.squatRestSeconds);
+          writeSet(i, (s) => toggleSet(s, ph));
+        }}
       />
       <div className={styles.row} style={{ marginTop: 10 }}>
         <HowTo exercise={ex} />
@@ -248,7 +259,7 @@ function SquatBlock({ state, day, dateKey, edit }) {
 
 // ------------------------------------------------------------- Exercises
 
-function ExerciseCard({ ex, index, units, last, edit, onSwap }) {
+function ExerciseCard({ ex, index, units, last, edit, onSwap, onSetDone }) {
   const info = EXERCISE_BY_ID[ex.exId];
   const allDone = ex.sets.length > 0 && ex.sets.every((s) => s.done);
 
@@ -256,23 +267,24 @@ function ExerciseCard({ ex, index, units, last, edit, onSwap }) {
 
   return (
     <section className={`${styles.card} ${allDone ? styles.cardDone : ""}`}>
-      <div className={`${styles.row} ${styles.between}`} style={{ alignItems: "flex-start" }}>
+      <div className={styles.cardHead}>
         <div className={styles.grow}>
           <h3 className={styles.h3}>{info?.name ?? ex.exId}</h3>
           <div className={styles.muscles}>{info?.muscles}</div>
+          <div className={styles.row} style={{ marginTop: 8 }}>
+            <span className={styles.pill}>{groupLabel(info?.group)}</span>
+            <span className={`${styles.pill} ${styles.pillAccent}`}>
+              {ex.targetSets} × {ex.targetReps}
+            </span>
+          </div>
+          {last && (
+            <p style={{ marginTop: 6 }}>
+              Last time: {last.sets.map((s) => `${s.weight || "BW"}×${s.reps || "?"}`).join(", ")}
+            </p>
+          )}
         </div>
-        <div className={styles.row} style={{ justifyContent: "flex-end" }}>
-          <span className={styles.pill}>{groupLabel(info?.group)}</span>
-          <span className={`${styles.pill} ${styles.pillAccent}`}>
-            {ex.targetSets} × {ex.targetReps}
-          </span>
-        </div>
+        <MuscleMap {...musclesFor(ex.exId)} size="sm" />
       </div>
-      {last && (
-        <p style={{ marginTop: 6 }}>
-          Last time: {last.sets.map((s) => `${s.weight || "BW"}×${s.reps || "?"}`).join(", ")}
-        </p>
-      )}
 
       <SetTable
         sets={ex.sets}
@@ -282,7 +294,10 @@ function ExerciseCard({ ex, index, units, last, edit, onSwap }) {
           reps: ex.targetReps,
         })}
         onChange={(i, field, value) => writeSet(i, (s) => ({ ...s, [field]: value }))}
-        onToggle={(i, ph) => writeSet(i, (s) => toggleSet(s, ph))}
+        onToggle={(i, ph) => {
+          if (!ex.sets[i].done) onSetDone?.();
+          writeSet(i, (s) => toggleSet(s, ph));
+        }}
       />
 
       <div className={styles.row} style={{ marginTop: 10 }}>

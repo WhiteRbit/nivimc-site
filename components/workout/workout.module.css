@@ -13,7 +13,7 @@
 
   max-width: 760px;
   margin: 0 auto;
-  padding: 88px 16px 64px;
+  padding: 88px 16px 150px; /* room for the rest timer and site footer */
   color: var(--text);
   font-family: var(--font-jakarta, ui-sans-serif), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
@@ -77,7 +77,7 @@
 .tab {
   flex: 1;
   min-width: max-content;
-  padding: 8px 12px;
+  padding: 10px 12px;
   border: 0;
   border-radius: 10px;
   background: transparent;
@@ -169,6 +169,7 @@
 
 /* Buttons & inputs */
 .btn {
+  min-height: 44px;
   padding: 8px 12px;
   border-radius: 10px;
   border: 1px solid var(--line);
@@ -195,8 +196,9 @@
 }
 
 .btnSmall {
-  padding: 4px 8px;
-  font-size: 0.75rem;
+  min-height: 36px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
 }
 
 .btnBlock {
@@ -213,7 +215,9 @@
   background: rgba(0, 0, 0, 0.4);
   color: var(--text);
   font: inherit;
-  font-size: 0.9rem;
+  font-size: 16px; /* below 16px, iOS Safari zooms in on focus */
+  min-height: 44px;
+  box-sizing: border-box;
   min-width: 0;
 }
 
@@ -269,8 +273,8 @@
 }
 
 .check {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border-radius: 10px;
   border: 1px solid var(--line);
   background: transparent;
@@ -356,7 +360,8 @@
 }
 
 .rpe {
-  min-width: 40px;
+  min-width: 48px;
+  min-height: 44px;
   padding: 6px;
   border-radius: 8px;
   border: 1px solid var(--line);
@@ -507,4 +512,124 @@
   align-items: center;
   gap: 6px;
   margin-left: auto;
+}
+
+/* Muscle maps */
+.map {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.figure {
+  display: block;
+  height: 100%;
+  width: auto;
+  max-width: none;
+}
+
+.map_sm {
+  height: 84px;
+}
+
+.map_md {
+  height: 150px;
+}
+
+.map_lg {
+  height: 260px;
+  justify-content: center;
+}
+
+.mapLegend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.mapLegend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mapLegend i {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+.cardHead {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.steps {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+/* Rest timer — floats above the site footer */
+.timer {
+  position: fixed;
+  left: 50%;
+  bottom: 48px;
+  transform: translateX(-50%);
+  width: calc(100% - 24px);
+  max-width: 560px;
+  z-index: 70;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 90, 54, 0.5);
+  background: #161616;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+}
+
+.timerDone {
+  border-color: var(--ok);
+}
+
+.timerBar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--accent-soft);
+  transition: width 0.25s linear;
+}
+
+.timerDone .timerBar {
+  background: var(--ok-soft);
+}
+
+.timerBody {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+}
+
+.timerNum {
+  font-size: 1.6rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+/* Launched from the home screen: no site chrome, respect the notch */
+@media (display-mode: standalone) {
+  .app {
+    padding-top: calc(env(safe-area-inset-top) + 16px);
+    padding-bottom: calc(env(safe-area-inset-bottom) + 110px);
+  }
+  .timer {
+    bottom: calc(env(safe-area-inset-bottom) + 12px);
+  }
 }

@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import styles from "./workout.module.css";
 import HowTo from "./HowTo";
+import MuscleMap, { MapLegend } from "./MuscleMap";
+import { REGIONS, musclesFor } from "@/lib/workout/muscles";
 import { EXERCISES, GROUPS } from "@/lib/workout/exercises";
 import { DAY_NAMES } from "@/lib/workout/program";
 
@@ -13,13 +15,17 @@ export default function LibraryView({ state, update }) {
   const [group, setGroup] = useState("all");
   const [query, setQuery] = useState("");
   const [added, setAdded] = useState(null);
+  const [muscle, setMuscle] = useState(null); // region tapped on the body map
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
     return EXERCISES.filter(
-      (e) => (group === "all" || e.group === group) && (!q || e.name.toLowerCase().includes(q) || e.muscles.toLowerCase().includes(q)),
+      (e) =>
+        (group === "all" || e.group === group) &&
+        (!q || e.name.toLowerCase().includes(q) || e.muscles.toLowerCase().includes(q)) &&
+        (!muscle || musclesFor(e.id).primary.includes(muscle)),
     );
-  }, [group, query]);
+  }, [group, query, muscle]);
 
   const addTo = (exId, wd) => {
     update((s) => {
@@ -36,7 +42,22 @@ export default function LibraryView({ state, update }) {
       <p style={{ marginBottom: 12 }}>
         All {EXERCISES.length} exercises from <em>Strength Training Anatomy</em>, with the book page and form cues.
       </p>
-      <div className={styles.row} style={{ marginBottom: 12 }}>
+      <section className={styles.card}>
+        <div className={styles.label}>Tap a muscle to find exercises for it</div>
+        <div style={{ marginTop: 8 }}>
+          <MuscleMap primary={muscle ? [muscle] : []} size="lg" onRegion={(r) => setMuscle(muscle === r ? null : r)} />
+        </div>
+        <div className={`${styles.row} ${styles.between}`} style={{ marginTop: 8 }}>
+          <span style={{ fontWeight: 600 }}>{muscle ? `${REGIONS[muscle]} · ${results.length} exercises` : "All muscles"}</span>
+          {muscle && (
+            <button className={`${styles.btn} ${styles.btnSmall}`} onClick={() => setMuscle(null)}>
+              Clear
+            </button>
+          )}
+        </div>
+      </section>
+
+      <div className={styles.row} style={{ marginBottom: 8 }}>
         <input
           className={`${styles.input} ${styles.grow}`}
           placeholder="Search name or muscle…"
@@ -53,14 +74,21 @@ export default function LibraryView({ state, update }) {
         </select>
       </div>
 
+      <div style={{ marginBottom: 10 }}>
+        <MapLegend />
+      </div>
+
       {results.map((e) => (
         <section key={e.id} className={styles.card}>
-          <div className={`${styles.row} ${styles.between}`} style={{ alignItems: "flex-start" }}>
+          <div className={styles.cardHead}>
             <div className={styles.grow}>
               <h3 className={styles.h3}>{e.name}</h3>
               <div className={styles.muscles}>{e.muscles}</div>
+              <span className={styles.pill} style={{ marginTop: 8 }}>
+                p. {e.page}
+              </span>
             </div>
-            <span className={styles.pill}>p. {e.page}</span>
+            <MuscleMap {...musclesFor(e.id)} size="sm" />
           </div>
           <div className={styles.row} style={{ marginTop: 10 }}>
             <HowTo exercise={e} />

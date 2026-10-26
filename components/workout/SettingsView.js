@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import styles from "./workout.module.css";
+import { isIOS } from "./PhoneTools";
 
 const NUMBER_FIELDS = [
   { key: "startingTop", label: "First daily-max target", unit: true },
@@ -13,9 +14,11 @@ const NUMBER_FIELDS = [
   { key: "lightPct", label: "Light day weight (% of last top set)", suffix: "%" },
   { key: "lightSets", label: "Light day sets" },
   { key: "lightReps", label: "Light day reps" },
+  { key: "restSeconds", label: "Rest timer after a set (0 = off)", suffix: "s" },
+  { key: "squatRestSeconds", label: "Rest timer after a squat set", suffix: "s" },
 ];
 
-export default function SettingsView({ state, update, reset }) {
+export default function SettingsView({ state, update, reset, installer }) {
   const { settings } = state;
   const fileRef = useRef(null);
   const [msg, setMsg] = useState("");
@@ -45,6 +48,40 @@ export default function SettingsView({ state, update, reset }) {
 
   return (
     <div>
+      <section className={styles.card}>
+        <div className={styles.label}>Put it on your phone</div>
+        {installer.installed ? (
+          <p style={{ marginTop: 6 }}>Installed — you&apos;re using the home-screen app. It works offline at the gym.</p>
+        ) : installer.canInstall ? (
+          <>
+            <p style={{ marginTop: 6 }}>Add it to your home screen: full screen, its own icon, and it works offline.</p>
+            <button className={`${styles.btn} ${styles.btnPrimary}`} style={{ marginTop: 10 }} onClick={installer.install}>
+              Install app
+            </button>
+          </>
+        ) : isIOS() ? (
+          <ol className={styles.steps}>
+            <li>Open this page in Safari.</li>
+            <li>
+              Tap the <strong>Share</strong> button (square with an arrow).
+            </li>
+            <li>
+              Choose <strong>Add to Home Screen</strong>, then <strong>Add</strong>.
+            </li>
+          </ol>
+        ) : (
+          <ol className={styles.steps}>
+            <li>Open this page in Chrome.</li>
+            <li>
+              Tap the <strong>⋮</strong> menu.
+            </li>
+            <li>
+              Choose <strong>Add to Home screen</strong> or <strong>Install app</strong>.
+            </li>
+          </ol>
+        )}
+      </section>
+
       <section className={styles.card}>
         <div className={styles.label}>Units</div>
         <div className={styles.row} style={{ marginTop: 8 }}>

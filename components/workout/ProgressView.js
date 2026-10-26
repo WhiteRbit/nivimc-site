@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import styles from "./workout.module.css";
-import { DAY_NAMES, fromKey, weekdayOf } from "@/lib/workout/program";
+import { DAY_NAMES, fromKey, shiftDate, toKey, weekdayOf } from "@/lib/workout/program";
+import { REGIONS, weeklyVolume } from "@/lib/workout/muscles";
+import MuscleMap, { HeatLegend } from "./MuscleMap";
 import { dayHasActivity } from "@/lib/workout/log";
 import { EXERCISE_BY_ID } from "@/lib/workout/exercises";
 
@@ -41,6 +43,8 @@ export default function ProgressView({ state, openDay }) {
           {bestE1rm > 0 && <div className={styles.subtitle}>{units} (Epley)</div>}
         </div>
       </div>
+
+      <WeeklyMuscles logs={logs} />
 
       <section className={styles.card}>
         <div className={styles.label}>Squat daily-max top set ({units})</div>
@@ -87,6 +91,45 @@ export default function ProgressView({ state, openDay }) {
         </ul>
       </section>
     </div>
+  );
+}
+
+// Sets per muscle over the last 7 days (secondary muscles count half a set).
+const level = (sets) => (sets <= 0 ? 0 : sets < 4 ? 1 : sets < 8 ? 2 : sets < 12 ? 3 : 4);
+
+function WeeklyMuscles({ logs }) {
+  const today = toKey(new Date());
+  const keys = Array.from({ length: 7 }, (_, i) => shiftDate(today, -i));
+  const volume = weeklyVolume(logs, keys);
+  const levels = Object.fromEntries(Object.entries(volume).map(([r, v]) => [r, level(v)]));
+  const ranked = Object.entries(volume).sort((a, b) => b[1] - a[1]);
+  const missed = ranked.filter(([, v]) => v === 0).map(([r]) => REGIONS[r]);
+
+  return (
+    <section className={styles.card}>
+      <div className={styles.label}>Muscles trained · last 7 days</div>
+      <div style={{ marginTop: 8 }}>
+        <MuscleMap levels={levels} size="lg" />
+      </div>
+      <div style={{ marginTop: 8 }}>
+        <HeatLegend />
+      </div>
+      {missed.length > 0 && missed.length < ranked.length && (
+        <p style={{ marginTop: 8 }}>Not hit this week: {missed.join(", ")}.</p>
+      )}
+      <ul className={styles.list} style={{ marginTop: 8 }}>
+        {ranked
+          .filter(([, v]) => v > 0)
+          .map(([r, v]) => (
+            <li key={r} className={styles.listItem} style={{ padding: "6px 0" }}>
+              <span>{REGIONS[r]}</span>
+              <span style={{ fontWeight: 700 }}>
+                {Number.isInteger(v) ? v : v.toFixed(1)} {v === 1 ? "set" : "sets"}
+              </span>
+            </li>
+          ))}
+      </ul>
+    </section>
   );
 }
 
