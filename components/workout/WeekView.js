@@ -6,7 +6,7 @@ import ExercisePicker from "./ExercisePicker";
 import SwapSheet from "./SwapSheet";
 import { REGIONS, musclesFor } from "@/lib/workout/muscles";
 import { EXERCISE_BY_ID } from "@/lib/workout/exercises";
-import { DAY_NAMES, DEFAULT_PLAN, shiftDate, weekdayOf } from "@/lib/workout/program";
+import { DAY_NAMES, DEFAULT_PLAN, pyramidReps, shiftDate, weekdayOf } from "@/lib/workout/program";
 
 const ORDER = [1, 2, 3, 4, 5, 6, 0]; // Monday first
 
@@ -72,7 +72,7 @@ export default function WeekView({ state, update, todayKey, openDay }) {
               <li className={styles.listItem}>
                 <div className={styles.grow}>
                   <div style={{ fontWeight: 600 }}>Back Squat</div>
-                  <div className={styles.muscles}>{light ? "Light / recovery sets" : "Daily max + back-off sets"}</div>
+                  <div className={styles.muscles}>{light ? "Light / recovery sets" : `Pyramid ${pyramidReps(settings).join("-")} reps, light → heavy`}</div>
                 </div>
                 <label className={styles.toggle}>
                   <input type="checkbox" checked={light} onChange={() => toggleLight(wd)} />

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import styles from "./workout.module.css";
-import { DAY_NAMES, fromKey, shiftDate, toKey, weekdayOf } from "@/lib/workout/program";
+import { DAY_NAMES, fromKey, shiftDate, squatTop, toKey, weekdayOf } from "@/lib/workout/program";
 import { REGIONS, weeklyVolume } from "@/lib/workout/muscles";
 import MuscleMap, { HeatLegend } from "./MuscleMap";
 import { dayHasActivity } from "@/lib/workout/log";
@@ -17,9 +17,8 @@ export default function ProgressView({ state, openDay }) {
 
   const tops = Object.keys(logs)
     .sort()
-    .map((k) => ({ date: k, top: logs[k]?.squat?.top, light: logs[k]?.squat?.light }))
-    .filter((x) => x.top && Number(x.top.weight) > 0 && !x.light)
-    .map((x) => ({ date: x.date, weight: Number(x.top.weight), reps: Number(x.top.reps) || 1, rpe: x.top.rpe }));
+    .map((k) => ({ date: k, ...squatTop(logs[k]?.squat) }))
+    .filter((x) => x.weight > 0);
 
   const best = tops.reduce((m, t) => (t.weight > (m?.weight ?? 0) ? t : m), null);
   const bestE1rm = tops.reduce((m, t) => Math.max(m, e1rm(t.weight, t.reps)), 0);
@@ -47,7 +46,7 @@ export default function ProgressView({ state, openDay }) {
       <WeeklyMuscles logs={logs} />
 
       <section className={styles.card}>
-        <div className={styles.label}>Squat daily-max top set ({units})</div>
+        <div className={styles.label}>Squat top set ({units})</div>
         {tops.length < 2 ? (
           <p className={styles.empty}>Log at least two heavy squat days to see your trend.</p>
         ) : (
@@ -61,7 +60,7 @@ export default function ProgressView({ state, openDay }) {
         <ul className={styles.list}>
           {sessions.map((k) => {
             const d = logs[k];
-            const top = d.squat?.top;
+            const top = squatTop(d.squat);
             const doneSets = (d.exercises || []).reduce((n, e) => n + e.sets.filter((s) => s.done).length, 0);
             const lifts = (d.exercises || []).filter((e) => e.sets.some((s) => s.done)).map((e) => EXERCISE_BY_ID[e.exId]?.name);
             return (
@@ -75,7 +74,7 @@ export default function ProgressView({ state, openDay }) {
                     Squat:{" "}
                     {d.squat?.light
                       ? "light day"
-                      : top && Number(top.weight) > 0
+                      : top
                         ? `${top.weight} × ${top.reps || "?"}${top.rpe ? ` @ RPE ${top.rpe}` : ""}`
                         : "—"}
                     {doneSets > 0 && ` · ${doneSets} sets: ${lifts.join(", ")}`}
