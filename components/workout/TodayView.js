@@ -189,6 +189,7 @@ export default function TodayView({ state, update, dateKey, setDateKey, todayKey
           day={day}
           title={title}
           onEditTime={setTime}
+          onSetBodyWeight={(bw) => update((st) => ({ ...st, settings: { ...st.settings, bodyWeight: bw } }))}
           onClose={() => setSummaryOpen(false)}
         />
       )}
