@@ -5,7 +5,7 @@ import styles from "./workout.module.css";
 import ExercisePicker from "./ExercisePicker";
 import SwapSheet from "./SwapSheet";
 import { REGIONS, musclesFor } from "@/lib/workout/muscles";
-import { EXERCISE_BY_ID } from "@/lib/workout/exercises";
+import { EXERCISE_BY_ID, sourceLabel } from "@/lib/workout/exercises";
 import { DAY_NAMES, DEFAULT_PLAN, pyramidReps, shiftDate, weekdayOf } from "@/lib/workout/program";
 
 const ORDER = [1, 2, 3, 4, 5, 6, 0]; // Monday first
@@ -87,7 +87,7 @@ export default function WeekView({ state, update, todayKey, openDay }) {
                       {musclesFor(it.exId)
                         .primary.map((r) => REGIONS[r])
                         .join(", ")}{" "}
-                      · p. {EXERCISE_BY_ID[it.exId]?.page}
+                      · {sourceLabel(EXERCISE_BY_ID[it.exId])}
                     </div>
                   </div>
                   <div className={styles.planControls}>

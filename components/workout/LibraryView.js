@@ -5,7 +5,7 @@ import styles from "./workout.module.css";
 import HowTo from "./HowTo";
 import MuscleMap, { MapLegend } from "./MuscleMap";
 import { REGIONS, musclesFor } from "@/lib/workout/muscles";
-import { EXERCISES, GROUPS } from "@/lib/workout/exercises";
+import { ACTIVE_EXERCISES, ACTIVE_GROUPS, sourceLabel } from "@/lib/workout/exercises";
 import { DAY_NAMES } from "@/lib/workout/program";
 
 const ORDER = [1, 2, 3, 4, 5, 6, 0];
@@ -19,7 +19,7 @@ export default function LibraryView({ state, update }) {
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return EXERCISES.filter(
+    return ACTIVE_EXERCISES.filter(
       (e) =>
         (group === "all" || e.group === group) &&
         (!q || e.name.toLowerCase().includes(q) || e.muscles.toLowerCase().includes(q)) &&
@@ -40,7 +40,7 @@ export default function LibraryView({ state, update }) {
   return (
     <div>
       <p style={{ marginBottom: 12 }}>
-        All {EXERCISES.length} exercises from <em>Strength Training Anatomy</em>, with the book page and form cues.
+        {ACTIVE_EXERCISES.length} exercises: the lifts from <em>Strength Training Anatomy</em> (with book page) plus core work, each with form cues.
       </p>
       <section className={styles.card}>
         <div className={styles.label}>Tap a muscle to find exercises for it</div>
@@ -66,7 +66,7 @@ export default function LibraryView({ state, update }) {
         />
         <select className={styles.select} value={group} onChange={(e) => setGroup(e.target.value)} aria-label="Chapter">
           <option value="all">All chapters</option>
-          {GROUPS.map((g) => (
+          {ACTIVE_GROUPS.map((g) => (
             <option key={g.id} value={g.id}>
               {g.label}
             </option>
@@ -85,7 +85,7 @@ export default function LibraryView({ state, update }) {
               <h3 className={styles.h3}>{e.name}</h3>
               <div className={styles.muscles}>{e.muscles}</div>
               <span className={styles.pill} style={{ marginTop: 8 }}>
-                p. {e.page}
+                {sourceLabel(e)}
               </span>
             </div>
             <MuscleMap {...musclesFor(e.id)} size="sm" />

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import styles from "./workout.module.css";
-import { EXERCISES, GROUPS } from "@/lib/workout/exercises";
+import { ACTIVE_EXERCISES, ACTIVE_GROUPS, sourceLabel } from "@/lib/workout/exercises";
 
 // Modal list of every exercise in the book, filterable by chapter and name.
 export default function ExercisePicker({ title, initialGroup = "all", onPick, onClose }) {
@@ -11,7 +11,7 @@ export default function ExercisePicker({ title, initialGroup = "all", onPick, on
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return EXERCISES.filter(
+    return ACTIVE_EXERCISES.filter(
       (e) =>
         (group === "all" || e.group === group) &&
         (!q || e.name.toLowerCase().includes(q) || e.muscles.toLowerCase().includes(q)),
@@ -37,7 +37,7 @@ export default function ExercisePicker({ title, initialGroup = "all", onPick, on
           />
           <select className={styles.select} value={group} onChange={(e) => setGroup(e.target.value)} aria-label="Chapter">
             <option value="all">All chapters</option>
-            {GROUPS.map((g) => (
+            {ACTIVE_GROUPS.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.label}
               </option>
@@ -50,7 +50,7 @@ export default function ExercisePicker({ title, initialGroup = "all", onPick, on
               <div className={styles.grow}>
                 <div style={{ fontWeight: 600 }}>{e.name}</div>
                 <div className={styles.muscles}>
-                  {e.muscles} · p. {e.page}
+                  {e.muscles} · {sourceLabel(e)}
                 </div>
               </div>
               <button className={`${styles.btn} ${styles.btnSmall}`} onClick={() => onPick(e.id)}>

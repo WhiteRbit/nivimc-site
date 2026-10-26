@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import styles from "./workout.module.css";
 import { isIOS } from "./PhoneTools";
+import { PLAN_VERSION, migratePlan } from "@/lib/workout/program";
 
 const NUMBER_FIELDS = [
   { key: "startingTop", label: "Starting top-set weight (first day)", unit: true },
@@ -37,7 +38,12 @@ export default function SettingsView({ state, update, reset, installer }) {
     try {
       const data = JSON.parse(await file.text());
       if (!data || typeof data !== "object" || !data.logs || !data.plan) throw new Error("bad file");
-      update((s) => ({ settings: { ...s.settings, ...data.settings }, plan: data.plan, logs: data.logs }));
+      update((s) => ({
+        version: PLAN_VERSION,
+        settings: { ...s.settings, ...data.settings },
+        plan: migratePlan(data.plan, data.version ?? 1),
+        logs: data.logs,
+      }));
       setMsg("Backup restored.");
     } catch {
       setMsg("That file doesn't look like a workout backup.");
