@@ -11,12 +11,11 @@ import { EXERCISE_BY_ID, groupLabel } from "@/lib/workout/exercises";
 import {
   DAY_NAMES,
   SQUAT_EXERCISE_ID,
-  backoffWeight,
   fromKey,
   lightWeight,
+  pyramidSets,
   shiftDate,
   suggestTarget,
-  warmupSets,
   weekdayOf,
 } from "@/lib/workout/program";
 import { lastPerformance, newSet, viewDay, withDay } from "@/lib/workout/log";
@@ -159,15 +158,16 @@ function SquatBlock({ state, day, dateKey, edit, onSetDone }) {
   const target = suggestTarget(logs, dateKey, settings);
   const ex = EXERCISE_BY_ID[SQUAT_EXERCISE_ID];
 
-  const setCount = isLight ? settings.lightSets : settings.backoffSets;
-  const sets = Array.from({ length: Math.max(setCount, squat.sets.length) }, (_, i) => squat.sets[i] || newSet());
-  const topWeight = Number(squat.top.weight) || target.weight;
-  const workWeight = isLight ? lightWeight(logs, dateKey, settings) : backoffWeight(topWeight, settings);
-  const workReps = isLight ? settings.lightReps : settings.backoffReps;
-  const topDone = Number(squat.top.weight) > 0 && squat.top.rpe != null;
+  // Planned sets: a pyramid up to the target, or flat light sets.
+  const plan = isLight
+    ? Array.from({ length: settings.lightSets }, () => ({ weight: lightWeight(logs, dateKey, settings), reps: settings.lightReps }))
+    : pyramidSets(target.weight, settings);
+  const sets = Array.from({ length: Math.max(plan.length, squat.sets.length) }, (_, i) => squat.sets[i] || newSet());
+  const lastIndex = plan.length - 1;
 
   const writeSet = (i, fn) =>
     edit((d) => {
+      d.squat.light = isLight; // pin the day type once something is logged
       d.squat.sets = Array.from({ length: sets.length }, (_, k) => d.squat.sets[k] || newSet());
       d.squat.sets[i] = fn(d.squat.sets[i]);
     });
@@ -180,102 +180,72 @@ function SquatBlock({ state, day, dateKey, edit, onSetDone }) {
           <h3 className={styles.h3}>Back Squat</h3>
           <div className={styles.muscles}>{ex.muscles}</div>
           <label className={styles.toggle} style={{ marginTop: 8 }}>
-            <input type="checkbox" checked={isLight} onChange={(e) => edit((d) => (d.squat.light = e.target.checked))} />
+            <input
+              type="checkbox"
+              checked={isLight}
+              onChange={(e) =>
+                edit((d) => {
+                  d.squat.light = e.target.checked;
+                  d.squat.sets = d.squat.sets.filter((x) => x.done); // planned numbers change with the day type
+                })
+              }
+            />
             Light / recovery day
           </label>
         </div>
         <MuscleMap {...musclesFor(SQUAT_EXERCISE_ID)} size="sm" />
       </div>
 
-      {!isLight && (
-        <div className={styles.stack} style={{ marginTop: 12 }}>
-          <div>
-            <div className={styles.label}>Today&apos;s daily-max target</div>
-            <div className={styles.target}>
-              {target.weight} <span className={styles.subtitle}>{units} × 1–3</span>
-            </div>
-            <p>{target.reason}</p>
+      {isLight ? (
+        <p style={{ marginTop: 12 }}>
+          Still squatting — just easy. {settings.lightSets} × {settings.lightReps} at about {settings.lightPct}% of your last
+          heavy top set. Move well and leave fresher than you came in.
+        </p>
+      ) : (
+        <div style={{ marginTop: 12 }}>
+          <div className={styles.label}>Pyramid · add weight, drop reps every set</div>
+          <div className={styles.target} style={{ marginTop: 4 }}>
+            {target.weight} <span className={styles.subtitle}>{units} top set × {plan[lastIndex].reps}</span>
           </div>
-
-          <div>
-            <div className={styles.label}>Warm-up ramp</div>
-            <div className={styles.ramp}>
-              {warmupSets(target.weight, settings).map((w, i) => (
-                <span key={i} className={styles.rampStep}>
-                  {w.weight} × {w.reps}
-                </span>
-              ))}
-              <span className={`${styles.rampStep} ${styles.pillAccent}`}>Top set</span>
-            </div>
-          </div>
-
-          <div>
-            <div className={styles.label}>Top set — stop before form breaks, no grinders</div>
-            <div className={styles.row} style={{ marginTop: 6 }}>
-              <input
-                className={`${styles.input} ${styles.num}`}
-                inputMode="decimal"
-                placeholder={String(target.weight)}
-                value={squat.top.weight}
-                onChange={(e) => edit((d) => (d.squat.top.weight = e.target.value))}
-                aria-label="Top set weight"
-              />
-              <span className={styles.subtitle}>{units} ×</span>
-              <input
-                className={`${styles.input} ${styles.num}`}
-                inputMode="numeric"
-                placeholder="1–3"
-                value={squat.top.reps}
-                onChange={(e) => edit((d) => (d.squat.top.reps = e.target.value))}
-                aria-label="Top set reps"
-              />
-              <span className={styles.subtitle}>reps</span>
-            </div>
-            <div className={styles.label} style={{ marginTop: 10 }}>
-              How hard was it? (RPE)
-            </div>
-            <div className={styles.rpeRow} style={{ marginTop: 6 }}>
-              {[6, 7, 8, 9, 10].map((r) => (
-                <button
-                  key={r}
-                  className={`${styles.rpe} ${squat.top.rpe === r ? styles.rpeOn : ""}`}
-                  onClick={() =>
-                    edit((d) => {
-                      d.squat.top.rpe = d.squat.top.rpe === r ? null : r;
-                      if (d.squat.top.weight === "") d.squat.top.weight = String(target.weight);
-                    })
-                  }
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-            <p style={{ marginTop: 6 }}>8 = 2 reps left in the tank · 9 = 1 left · 10 = nothing left.</p>
-          </div>
+          <p>{target.reason}</p>
         </div>
       )}
 
-      {isLight && (
-        <p style={{ marginTop: 12 }}>
-          Still squatting — just easy. {settings.lightSets} × {settings.lightReps} at about {settings.lightPct}% of your last heavy top set.
-          Move well, get blood flowing, leave fresher than you came in.
-        </p>
-      )}
-
-      <div className={styles.label} style={{ marginTop: 14 }}>
-        {isLight ? "Light sets" : `Back-off sets @ ${settings.backoffPct}% of top`}
-        {!isLight && !topDone && " (log your top set first)"}
-      </div>
       <SetTable
         sets={sets}
         units={units}
-        placeholder={() => ({ weight: workWeight, reps: workReps })}
+        placeholder={(i) => plan[i] ?? plan[lastIndex]}
+        labelFor={(i) => (!isLight && i === lastIndex ? "Top" : i + 1)}
         onChange={(i, field, value) => writeSet(i, (s) => ({ ...s, [field]: value }))}
         onToggle={(i, ph) => {
           if (!sets[i].done) onSetDone?.(state.settings.squatRestSeconds);
           writeSet(i, (s) => toggleSet(s, ph));
         }}
       />
+
+      {!isLight && (
+        <div style={{ marginTop: 12 }}>
+          <div className={styles.label}>How hard was the top set? (RPE)</div>
+          <div className={styles.rpeRow} style={{ marginTop: 6 }}>
+            {[6, 7, 8, 9, 10].map((r) => (
+              <button
+                key={r}
+                className={`${styles.rpe} ${squat.rpe === r ? styles.rpeOn : ""}`}
+                onClick={() =>
+                  edit((d) => {
+                    d.squat.light = isLight;
+                    d.squat.rpe = d.squat.rpe === r ? null : r;
+                  })
+                }
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+          <p style={{ marginTop: 6 }}>8 = 2 reps left in the tank · 9 = 1 left · 10 = nothing left. Stop before form breaks.</p>
+        </div>
+      )}
+
       <div className={styles.row} style={{ marginTop: 10 }}>
         <HowTo exercise={ex} />
       </div>

@@ -1,8 +1,8 @@
 // Service worker for the installed workout app (scope: /workout).
 // Pages: network first, falling back to the cached copy so the app opens offline.
-// Build assets and icons: cache first (their file names change on every deploy).
+// Build assets, icons and exercise photos: cache first (they never change in place).
 
-const CACHE = "workout-v1";
+const CACHE = "workout-v2";
 const SHELL = [
   "/workout",
   "/workout.webmanifest",
@@ -51,7 +51,7 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate") {
     event.respondWith(networkFirst(request, "/workout"));
-  } else if (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/workout-icons/")) {
+  } else if (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/workout-icons/") || url.pathname.startsWith("/workout-photos/")) {
     event.respondWith(cacheFirst(request));
   } else {
     event.respondWith(networkFirst(request));

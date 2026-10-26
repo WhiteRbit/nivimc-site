@@ -5,12 +5,10 @@ import styles from "./workout.module.css";
 import { isIOS } from "./PhoneTools";
 
 const NUMBER_FIELDS = [
-  { key: "startingTop", label: "First daily-max target", unit: true },
+  { key: "startingTop", label: "Starting top-set weight (first day)", unit: true },
   { key: "barWeight", label: "Empty bar weight", unit: true },
   { key: "increment", label: "Progression step (and plate rounding)", unit: true },
-  { key: "backoffPct", label: "Back-off weight (% of top set)", suffix: "%" },
-  { key: "backoffSets", label: "Back-off sets" },
-  { key: "backoffReps", label: "Back-off reps" },
+  { key: "startPct", label: "First pyramid set (% of top set)", suffix: "%" },
   { key: "lightPct", label: "Light day weight (% of last top set)", suffix: "%" },
   { key: "lightSets", label: "Light day sets" },
   { key: "lightReps", label: "Light day reps" },
@@ -101,6 +99,18 @@ export default function SettingsView({ state, update, reset, installer }) {
       <section className={styles.card}>
         <div className={styles.label}>Squat Every Day settings</div>
         <ul className={styles.list} style={{ marginTop: 4 }}>
+          <li className={styles.listItem}>
+            <span className={styles.grow} style={{ fontSize: "0.9rem" }}>
+              Pyramid reps per set
+            </span>
+            <input
+              className={styles.input}
+              style={{ width: 130, textAlign: "center" }}
+              value={settings.pyramidReps}
+              onChange={(e) => set("pyramidReps", e.target.value)}
+              aria-label="Pyramid reps per set"
+            />
+          </li>
           {NUMBER_FIELDS.map((f) => (
             <li key={f.key} className={styles.listItem}>
               <span className={styles.grow} style={{ fontSize: "0.9rem" }}>
@@ -123,7 +133,8 @@ export default function SettingsView({ state, update, reset, installer }) {
           ))}
         </ul>
         <p style={{ marginTop: 8 }}>
-          How the app progresses you: log your top set and its RPE. RPE 8 or easier → next heavy day adds one step. RPE 9 →
+          The squat is a pyramid: the first set is light for the most reps, then every set adds weight and drops reps up
+          to the top set. Rate the top set after you finish: RPE 8 or easier → next heavy day adds one step. RPE 9 →
           repeat the weight. RPE 10 → drop about 10% and rebuild.
         </p>
       </section>
@@ -168,8 +179,8 @@ export default function SettingsView({ state, update, reset, installer }) {
 
       <p className={styles.note}>
         Exercises, page numbers and form cues are drawn from Frédéric Delavier&apos;s <em>Strength Training Anatomy</em>{" "}
-        (Human Kinetics). The daily squat follows the idea of Cory Gregory&apos;s &quot;Squat Every Day&quot; program: squat every
-        day, work up to a clean daily max without grinding, then do back-off sets. The exact percentages here are this
+        (Human Kinetics). Exercise photos come from the Free Exercise DB (github.com/yuhonas/free-exercise-db). The daily squat follows the idea of Cory Gregory&apos;s &quot;Squat Every Day&quot; program: squat every
+        day, pyramiding from light high-rep sets up to a clean heavy top set without grinding. The exact numbers here are this
         app&apos;s defaults, not the official program — tune them to you. This is a tracker, not medical advice; stop if
         something hurts.
       </p>
