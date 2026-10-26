@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import styles from "./workout.module.css";
 import { isIOS } from "./PhoneTools";
-import { PLAN_VERSION, migratePlan } from "@/lib/workout/program";
+import { PLAN_VERSION, convertUnits, migratePlan } from "@/lib/workout/program";
 
 const NUMBER_FIELDS = [
   { key: "startingTop", label: "Starting top-set weight (first day)", unit: true },
@@ -93,13 +93,16 @@ export default function SettingsView({ state, update, reset, installer }) {
             <button
               key={u}
               className={`${styles.btn} ${settings.units === u ? styles.btnPrimary : ""}`}
-              onClick={() => set("units", u)}
+              onClick={() => update((s) => convertUnits(s, u))}
             >
               {u}
             </button>
           ))}
         </div>
-        <p style={{ marginTop: 8 }}>Switching units only changes the label — numbers you&apos;ve already logged aren&apos;t converted.</p>
+        <p style={{ marginTop: 8 }}>
+          Switching converts everything: your logged weights, squat target, bar weight (20 kg ⇄ 45 lb) and progression step
+          (2.5 kg ⇄ 5 lb).
+        </p>
       </section>
 
       <section className={styles.card}>
