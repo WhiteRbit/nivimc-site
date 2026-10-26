@@ -68,7 +68,7 @@ export default function ProgressView({ state, openDay }) {
                 <div className={styles.grow}>
                   <div style={{ fontWeight: 600 }}>
                     {fromKey(k).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })} ·{" "}
-                    {plan[weekdayOf(k)]?.title || DAY_NAMES[weekdayOf(k)]}
+                    {d.title || plan[weekdayOf(k)]?.title || DAY_NAMES[weekdayOf(k)]}
                   </div>
                   <div className={styles.muscles}>
                     Squat:{" "}

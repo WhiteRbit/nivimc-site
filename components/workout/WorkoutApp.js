@@ -8,7 +8,7 @@ import ProgressView from "./ProgressView";
 import LibraryView from "./LibraryView";
 import SettingsView from "./SettingsView";
 import { RestTimer, useInstallPrompt, useRestTimer, useWakeLock } from "./PhoneTools";
-import { DEFAULT_PLAN, DEFAULT_SETTINGS, squatStreak, toKey } from "@/lib/workout/program";
+import { DEFAULT_PLAN, DEFAULT_SETTINGS, PLAN_VERSION, migratePlan, squatStreak, toKey } from "@/lib/workout/program";
 
 const STORAGE_KEY = "nivimc-workout-v1";
 
@@ -22,6 +22,7 @@ const TABS = [
 
 function freshState() {
   return {
+    version: PLAN_VERSION,
     settings: { ...DEFAULT_SETTINGS },
     plan: JSON.parse(JSON.stringify(DEFAULT_PLAN)),
     logs: {},
@@ -35,8 +36,9 @@ function loadState() {
     const saved = JSON.parse(raw);
     const base = freshState();
     return {
+      version: PLAN_VERSION,
       settings: { ...base.settings, ...saved.settings },
-      plan: saved.plan || base.plan,
+      plan: saved.plan ? migratePlan(saved.plan, saved.version ?? 1) : base.plan,
       logs: saved.logs || {},
     };
   } catch {

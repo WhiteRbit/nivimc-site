@@ -4,7 +4,7 @@ import { useState } from "react";
 import styles from "./workout.module.css";
 import HowTo from "./HowTo";
 import MuscleMap, { MapLegend } from "./MuscleMap";
-import { EXERCISES, EXERCISE_BY_ID } from "@/lib/workout/exercises";
+import { ACTIVE_EXERCISES, EXERCISE_BY_ID, sourceLabel } from "@/lib/workout/exercises";
 import { REGIONS, alternativesFor, musclesFor } from "@/lib/workout/muscles";
 import { SQUAT_EXERCISE_ID } from "@/lib/workout/program";
 
@@ -14,7 +14,7 @@ export default function SwapSheet({ exId, keepLabel, onPick, onClose }) {
   const [keep, setKeep] = useState(true);
   const current = EXERCISE_BY_ID[exId];
   const target = musclesFor(exId).primary;
-  const options = alternativesFor(exId, EXERCISES).filter((a) => a.exercise.id !== SQUAT_EXERCISE_ID);
+  const options = alternativesFor(exId, ACTIVE_EXERCISES).filter((a) => a.exercise.id !== SQUAT_EXERCISE_ID);
 
   return (
     <div className={styles.backdrop} onClick={onClose} role="presentation">
@@ -54,7 +54,7 @@ export default function SwapSheet({ exId, keepLabel, onPick, onClose }) {
                 <div className={styles.grow}>
                   <div style={{ fontWeight: 700 }}>{e.name}</div>
                   <div className={styles.muscles}>
-                    Works {shared.map((r) => REGIONS[r]).join(", ")} · p. {e.page}
+                    Works {shared.map((r) => REGIONS[r]).join(", ")} · {sourceLabel(e)}
                   </div>
                   <div className={styles.row} style={{ marginTop: 8 }}>
                     <button className={`${styles.btn} ${styles.btnPrimary} ${styles.btnSmall}`} onClick={() => onPick(e.id, keep)}>

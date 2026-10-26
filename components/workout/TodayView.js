@@ -6,6 +6,7 @@ import SetTable, { toggleSet } from "./SetTable";
 import HowTo from "./HowTo";
 import ExercisePicker from "./ExercisePicker";
 import SwapSheet from "./SwapSheet";
+import WorkoutPicker from "./WorkoutPicker";
 import MuscleMap, { MapLegend } from "./MuscleMap";
 import { EXERCISE_BY_ID, groupLabel } from "@/lib/workout/exercises";
 import {
@@ -18,15 +19,47 @@ import {
   suggestTarget,
   weekdayOf,
 } from "@/lib/workout/program";
-import { lastPerformance, newSet, viewDay, withDay } from "@/lib/workout/log";
+import { lastPerformance, newSet, snapshotFromWeekday, viewDay, withDay } from "@/lib/workout/log";
 import { musclesFor } from "@/lib/workout/muscles";
 
 export default function TodayView({ state, update, dateKey, setDateKey, todayKey, onSetDone }) {
   const [picker, setPicker] = useState(false); // add-exercise list open
   const [swapIndex, setSwapIndex] = useState(null); // exercise being swapped
+  const [choosing, setChoosing] = useState(false); // change-workout sheet open
   const day = viewDay(state, dateKey);
   const weekday = weekdayOf(dateKey);
   const planDay = state.plan[weekday] || { title: "Rest", items: [] };
+  const title = day.title ?? planDay.title;
+
+  const hasDoneSets = day.exercises.some((e) => e.sets.some((x) => x.done));
+  const confirmReplace = () =>
+    !hasDoneSets || window.confirm("Replace today's exercises? Sets you've already ticked off on them will be removed.");
+
+  const pickWorkout = (wd, swapDays) => {
+    if (!confirmReplace()) return;
+    update((s) => {
+      let plan = s.plan;
+      if (swapDays && wd !== weekday) {
+        plan = { ...s.plan, [weekday]: s.plan[wd], [wd]: s.plan[weekday] };
+      }
+      const next = withDay({ ...s, plan }, dateKey, (d) => {
+        // After a plan swap the chosen routine *is* today's plan, so no override is needed.
+        d.title = swapDays ? null : plan[wd].title;
+        d.exercises = snapshotFromWeekday(plan, swapDays ? weekday : wd);
+      });
+      return next;
+    });
+    setChoosing(false);
+  };
+
+  const resetWorkout = () => {
+    if (!confirmReplace()) return;
+    edit((d) => {
+      d.title = null;
+      d.exercises = snapshotFromWeekday(state.plan, weekday);
+    });
+    setChoosing(false);
+  };
   const units = state.settings.units;
 
   const edit = (fn) => update((s) => withDay(s, dateKey, fn));
@@ -42,7 +75,7 @@ export default function TodayView({ state, update, dateKey, setDateKey, todayKey
         </button>
         <div className={styles.dateText}>
           <div className={styles.dateMain}>
-            {relative} · {planDay.title}
+            {relative} · {title}
           </div>
           <div className={styles.subtitle}>{dateLabel}</div>
         </div>
@@ -59,6 +92,10 @@ export default function TodayView({ state, update, dateKey, setDateKey, todayKey
           Jump to today
         </button>
       )}
+
+      <button className={`${styles.btn} ${styles.btnBlock}`} style={{ marginBottom: 12 }} onClick={() => setChoosing(true)}>
+        ⇄ Change workout{day.title ? ` · planned: ${planDay.title}` : ""}
+      </button>
 
       <div style={{ marginBottom: 10 }}>
         <MapLegend />
@@ -118,10 +155,22 @@ export default function TodayView({ state, update, dateKey, setDateKey, todayKey
         />
       )}
 
+      {choosing && (
+        <WorkoutPicker
+          plan={state.plan}
+          weekday={weekday}
+          currentTitle={title}
+          overridden={Boolean(day.title)}
+          onPick={pickWorkout}
+          onReset={resetWorkout}
+          onClose={() => setChoosing(false)}
+        />
+      )}
+
       {swapIndex != null && day.exercises[swapIndex] && (
         <SwapSheet
           exId={day.exercises[swapIndex].exId}
-          keepLabel={`Keep this swap every ${DAY_NAMES[weekday]}`}
+          keepLabel={day.title ? undefined : `Keep this swap every ${DAY_NAMES[weekday]}`}
           onClose={() => setSwapIndex(null)}
           onPick={(newId, keep) => {
             const oldId = day.exercises[swapIndex].exId;
@@ -132,7 +181,8 @@ export default function TodayView({ state, update, dateKey, setDateKey, todayKey
                 // Numbers typed for the old exercise don't apply to the new one.
                 ex.sets = ex.sets.map((set) => (set.done ? set : newSet()));
               });
-              if (!keep) return next;
+              // A routine borrowed from another day isn't this weekday's plan, so swaps there stay today-only.
+              if (!keep || day.title) return next;
               const plan = JSON.parse(JSON.stringify(next.plan));
               // Match by exercise; if it was already swapped for today only, fall back to its slot.
               const items = plan[weekday]?.items ?? [];
@@ -198,14 +248,17 @@ function SquatBlock({ state, day, dateKey, edit, onSetDone }) {
 
       {isLight ? (
         <p style={{ marginTop: 12 }}>
-          Still squatting — just easy. {settings.lightSets} × {settings.lightReps} at about {settings.lightPct}% of your last
-          heavy top set. Move well and leave fresher than you came in.
+          Still squatting — just easy. {settings.lightSets} × {settings.lightReps} at about {settings.lightPct}% of your last heavy top set.
+          Move well and leave fresher than you came in.
         </p>
       ) : (
         <div style={{ marginTop: 12 }}>
           <div className={styles.label}>Pyramid · add weight, drop reps every set</div>
           <div className={styles.target} style={{ marginTop: 4 }}>
-            {target.weight} <span className={styles.subtitle}>{units} top set × {plan[lastIndex].reps}</span>
+            {target.weight}{" "}
+            <span className={styles.subtitle}>
+              {units} top set × {plan[lastIndex].reps}
+            </span>
           </div>
           <p>{target.reason}</p>
         </div>
