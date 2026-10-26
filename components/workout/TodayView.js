@@ -5,6 +5,7 @@ import styles from "./workout.module.css";
 import SetTable, { toggleSet } from "./SetTable";
 import HowTo from "./HowTo";
 import ExercisePicker from "./ExercisePicker";
+import SwapSheet from "./SwapSheet";
 import MuscleMap, { MapLegend } from "./MuscleMap";
 import { EXERCISE_BY_ID, groupLabel } from "@/lib/workout/exercises";
 import {
@@ -22,7 +23,8 @@ import { lastPerformance, newSet, viewDay, withDay } from "@/lib/workout/log";
 import { musclesFor } from "@/lib/workout/muscles";
 
 export default function TodayView({ state, update, dateKey, setDateKey, todayKey, onSetDone }) {
-  const [picker, setPicker] = useState(null); // { mode: "add" } | { mode: "swap", index, group }
+  const [picker, setPicker] = useState(false); // add-exercise list open
+  const [swapIndex, setSwapIndex] = useState(null); // exercise being swapped
   const day = viewDay(state, dateKey);
   const weekday = weekdayOf(dateKey);
   const planDay = state.plan[weekday] || { title: "Rest", items: [] };
@@ -50,7 +52,11 @@ export default function TodayView({ state, update, dateKey, setDateKey, todayKey
         </button>
       </div>
       {dateKey !== todayKey && (
-        <button className={`${styles.btn} ${styles.btnGhost} ${styles.btnBlock}`} style={{ marginBottom: 12 }} onClick={() => setDateKey(todayKey)}>
+        <button
+          className={`${styles.btn} ${styles.btnGhost} ${styles.btnBlock}`}
+          style={{ marginBottom: 12 }}
+          onClick={() => setDateKey(todayKey)}
+        >
           Jump to today
         </button>
       )}
@@ -75,12 +81,12 @@ export default function TodayView({ state, update, dateKey, setDateKey, todayKey
           units={units}
           last={lastPerformance(state.logs, ex.exId, dateKey)}
           edit={edit}
-          onSwap={() => setPicker({ mode: "swap", index, group: EXERCISE_BY_ID[ex.exId]?.group })}
+          onSwap={() => setSwapIndex(index)}
           onSetDone={onSetDone}
         />
       ))}
 
-      <button className={`${styles.btn} ${styles.btnBlock}`} onClick={() => setPicker({ mode: "add" })}>
+      <button className={`${styles.btn} ${styles.btnBlock}`} onClick={() => setPicker(true)}>
         + Add exercise from the book
       </button>
 
@@ -104,18 +110,38 @@ export default function TodayView({ state, update, dateKey, setDateKey, todayKey
 
       {picker && (
         <ExercisePicker
-          title={picker.mode === "swap" ? "Swap exercise" : "Add exercise"}
-          initialGroup={picker.mode === "swap" ? picker.group : "all"}
-          onClose={() => setPicker(null)}
+          title="Add exercise"
+          onClose={() => setPicker(false)}
           onPick={(exId) => {
-            edit((d) => {
-              if (picker.mode === "swap") {
-                d.exercises[picker.index].exId = exId;
-              } else {
-                d.exercises.push({ exId, targetSets: 3, targetReps: "10", sets: [newSet(), newSet(), newSet()] });
-              }
+            edit((d) => d.exercises.push({ exId, targetSets: 3, targetReps: "10", sets: [newSet(), newSet(), newSet()] }));
+            setPicker(false);
+          }}
+        />
+      )}
+
+      {swapIndex != null && day.exercises[swapIndex] && (
+        <SwapSheet
+          exId={day.exercises[swapIndex].exId}
+          keepLabel={`Keep this swap every ${DAY_NAMES[weekday]}`}
+          onClose={() => setSwapIndex(null)}
+          onPick={(newId, keep) => {
+            const oldId = day.exercises[swapIndex].exId;
+            update((s) => {
+              const next = withDay(s, dateKey, (d) => {
+                const ex = d.exercises[swapIndex];
+                ex.exId = newId;
+                // Numbers typed for the old exercise don't apply to the new one.
+                ex.sets = ex.sets.map((set) => (set.done ? set : newSet()));
+              });
+              if (!keep) return next;
+              const plan = JSON.parse(JSON.stringify(next.plan));
+              // Match by exercise; if it was already swapped for today only, fall back to its slot.
+              const items = plan[weekday]?.items ?? [];
+              const item = items.find((it) => it.exId === oldId) ?? items[swapIndex];
+              if (item) item.exId = newId;
+              return { ...next, plan };
             });
-            setPicker(null);
+            setSwapIndex(null);
           }}
         />
       )}
@@ -231,8 +257,8 @@ function SquatBlock({ state, day, dateKey, edit, onSetDone }) {
 
       {isLight && (
         <p style={{ marginTop: 12 }}>
-          Still squatting — just easy. {settings.lightSets} × {settings.lightReps} at about {settings.lightPct}% of your last
-          heavy top set. Move well, get blood flowing, leave fresher than you came in.
+          Still squatting — just easy. {settings.lightSets} × {settings.lightReps} at about {settings.lightPct}% of your last heavy top set.
+          Move well, get blood flowing, leave fresher than you came in.
         </p>
       )}
 
@@ -277,11 +303,7 @@ function ExerciseCard({ ex, index, units, last, edit, onSwap, onSetDone }) {
               {ex.targetSets} × {ex.targetReps}
             </span>
           </div>
-          {last && (
-            <p style={{ marginTop: 6 }}>
-              Last time: {last.sets.map((s) => `${s.weight || "BW"}×${s.reps || "?"}`).join(", ")}
-            </p>
-          )}
+          {last && <p style={{ marginTop: 6 }}>Last time: {last.sets.map((s) => `${s.weight || "BW"}×${s.reps || "?"}`).join(", ")}</p>}
         </div>
         <MuscleMap {...musclesFor(ex.exId)} size="sm" />
       </div>
@@ -302,21 +324,24 @@ function ExerciseCard({ ex, index, units, last, edit, onSwap, onSetDone }) {
 
       <div className={styles.row} style={{ marginTop: 10 }}>
         <HowTo exercise={info} />
-        <button className={`${styles.btn} ${styles.btnGhost} ${styles.btnSmall}`} onClick={() => edit((d) => d.exercises[index].sets.push(newSet()))}>
+        <button
+          className={`${styles.btn} ${styles.btnGhost} ${styles.btnSmall}`}
+          onClick={() => edit((d) => d.exercises[index].sets.push(newSet()))}
+        >
           + Set
         </button>
         {ex.sets.length > 1 && (
-          <button className={`${styles.btn} ${styles.btnGhost} ${styles.btnSmall}`} onClick={() => edit((d) => d.exercises[index].sets.pop())}>
+          <button
+            className={`${styles.btn} ${styles.btnGhost} ${styles.btnSmall}`}
+            onClick={() => edit((d) => d.exercises[index].sets.pop())}
+          >
             − Set
           </button>
         )}
         <button className={`${styles.btn} ${styles.btnGhost} ${styles.btnSmall}`} onClick={onSwap}>
           Swap
         </button>
-        <button
-          className={`${styles.btn} ${styles.btnGhost} ${styles.btnSmall}`}
-          onClick={() => edit((d) => d.exercises.splice(index, 1))}
-        >
+        <button className={`${styles.btn} ${styles.btnGhost} ${styles.btnSmall}`} onClick={() => edit((d) => d.exercises.splice(index, 1))}>
           Remove
         </button>
       </div>

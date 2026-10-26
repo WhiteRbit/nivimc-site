@@ -3,6 +3,8 @@
 import { useState } from "react";
 import styles from "./workout.module.css";
 import ExercisePicker from "./ExercisePicker";
+import SwapSheet from "./SwapSheet";
+import { REGIONS, musclesFor } from "@/lib/workout/muscles";
 import { EXERCISE_BY_ID } from "@/lib/workout/exercises";
 import { DAY_NAMES, DEFAULT_PLAN, shiftDate, weekdayOf } from "@/lib/workout/program";
 
@@ -11,6 +13,7 @@ const ORDER = [1, 2, 3, 4, 5, 6, 0]; // Monday first
 // Editor for the weekly template. Changes apply to days you haven't logged yet.
 export default function WeekView({ state, update, todayKey, openDay }) {
   const [picker, setPicker] = useState(null); // weekday being added to
+  const [swap, setSwap] = useState(null); // { wd, i } of the item being swapped
   const { plan, settings } = state;
   const todayWd = weekdayOf(todayKey);
 
@@ -80,7 +83,12 @@ export default function WeekView({ state, update, todayKey, openDay }) {
                 <li key={`${it.exId}-${i}`} className={`${styles.listItem} ${styles.planItem}`}>
                   <div className={styles.planName}>
                     <div style={{ fontWeight: 600 }}>{EXERCISE_BY_ID[it.exId]?.name ?? it.exId}</div>
-                    <div className={styles.muscles}>p. {EXERCISE_BY_ID[it.exId]?.page}</div>
+                    <div className={styles.muscles}>
+                      {musclesFor(it.exId)
+                        .primary.map((r) => REGIONS[r])
+                        .join(", ")}{" "}
+                      · p. {EXERCISE_BY_ID[it.exId]?.page}
+                    </div>
                   </div>
                   <div className={styles.planControls}>
                     <input
@@ -98,6 +106,9 @@ export default function WeekView({ state, update, todayKey, openDay }) {
                       onChange={(e) => editDay(wd, (d) => (d.items[i].reps = e.target.value))}
                       aria-label="Reps"
                     />
+                    <button className={`${styles.btn} ${styles.btnGhost} ${styles.btnSmall}`} onClick={() => setSwap({ wd, i })}>
+                      Swap
+                    </button>
                     <button
                       className={`${styles.btn} ${styles.btnGhost} ${styles.btnSmall}`}
                       disabled={i === 0}
@@ -138,6 +149,17 @@ export default function WeekView({ state, update, todayKey, openDay }) {
       >
         Restore default plan
       </button>
+
+      {swap && plan[swap.wd]?.items[swap.i] && (
+        <SwapSheet
+          exId={plan[swap.wd].items[swap.i].exId}
+          onClose={() => setSwap(null)}
+          onPick={(exId) => {
+            editDay(swap.wd, (d) => (d.items[swap.i].exId = exId));
+            setSwap(null);
+          }}
+        />
+      )}
 
       {picker != null && (
         <ExercisePicker
