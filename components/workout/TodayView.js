@@ -8,6 +8,7 @@ import ExercisePicker from "./ExercisePicker";
 import SwapSheet from "./SwapSheet";
 import WorkoutPicker from "./WorkoutPicker";
 import SessionSummary from "./SessionSummary";
+import WorkoutTime from "./WorkoutTime";
 import MuscleMap, { MapLegend } from "./MuscleMap";
 import { EXERCISE_BY_ID, groupLabel } from "@/lib/workout/exercises";
 import {
@@ -53,6 +54,14 @@ export default function TodayView({ state, update, dateKey, setDateKey, todayKey
     });
     setChoosing(false);
   };
+
+  // Manually entered workout time (e.g. when logging a session afterwards).
+  const setTime = (startedAt, finishedAt) =>
+    edit((d) => {
+      d.startedAt = startedAt;
+      d.finishedAt = finishedAt;
+      d.timeManual = true;
+    });
 
   const resetWorkout = () => {
     if (!confirmReplace()) return;
@@ -129,6 +138,16 @@ export default function TodayView({ state, update, dateKey, setDateKey, todayKey
       </button>
 
       <div className={styles.card} style={{ marginTop: 12 }}>
+        <WorkoutTime
+          key={`${day.startedAt}-${day.finishedAt}`}
+          dateKey={dateKey}
+          startedAt={day.startedAt}
+          finishedAt={day.finishedAt}
+          onSave={setTime}
+        />
+      </div>
+
+      <div className={styles.card}>
         <div className={styles.label}>Notes</div>
         <textarea
           className={styles.textarea}
@@ -154,7 +173,7 @@ export default function TodayView({ state, update, dateKey, setDateKey, todayKey
           onClick={() => {
             edit((d) => {
               d.completed = true;
-              d.finishedAt = Date.now();
+              if (!d.timeManual) d.finishedAt = Date.now(); // keep a time the person entered by hand
             });
             setSummaryOpen(true);
           }}
@@ -163,7 +182,16 @@ export default function TodayView({ state, update, dateKey, setDateKey, todayKey
         </button>
       )}
 
-      {summaryOpen && <SessionSummary state={state} dateKey={dateKey} day={day} title={title} onClose={() => setSummaryOpen(false)} />}
+      {summaryOpen && (
+        <SessionSummary
+          state={state}
+          dateKey={dateKey}
+          day={day}
+          title={title}
+          onEditTime={setTime}
+          onClose={() => setSummaryOpen(false)}
+        />
+      )}
 
       {picker && (
         <ExercisePicker

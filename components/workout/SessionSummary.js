@@ -3,6 +3,7 @@
 import { useState } from "react";
 import styles from "./workout.module.css";
 import MuscleMap, { HeatLegend } from "./MuscleMap";
+import WorkoutTime, { fmtDuration } from "./WorkoutTime";
 import { EXERCISE_BY_ID } from "@/lib/workout/exercises";
 import { heatLevel, weeklyVolume } from "@/lib/workout/muscles";
 import { fromKey, lastTopSet, squatTop } from "@/lib/workout/program";
@@ -14,12 +15,6 @@ const num = (v) => {
 const done = (sets) => (sets || []).filter((s) => s.done);
 const fmtSet = (s) => `${s.weight === "" ? "BW" : s.weight}×${s.reps || "?"}`;
 const fmtVolume = (v) => (v >= 10000 ? `${(v / 1000).toFixed(1)}k` : Math.round(v).toLocaleString());
-
-function fmtDuration(ms) {
-  const min = Math.round(ms / 60000);
-  if (min < 60) return `${min} min`;
-  return `${Math.floor(min / 60)} h ${String(min % 60).padStart(2, "0")}`;
-}
 
 // Everything the person did in one session, shown when they finish it.
 export function summarize(state, dateKey, day) {
@@ -45,7 +40,13 @@ export function summarize(state, dateKey, day) {
     setCount: allSets.length,
     reps,
     volume,
-    squat: { sets: squatSets, top, light: day.squat.light, change: top && before ? top.weight - before.weight : null, pr: top && top.weight > bestBefore && bestBefore > 0 },
+    squat: {
+      sets: squatSets,
+      top,
+      light: day.squat.light,
+      change: top && before ? top.weight - before.weight : null,
+      pr: top && top.weight > bestBefore && bestBefore > 0,
+    },
     lifts,
     muscles: weeklyVolume({ [dateKey]: day }, [dateKey]),
     notes: day.notes,
@@ -54,15 +55,21 @@ export function summarize(state, dateKey, day) {
 
 function shareText(sum, dateLabel) {
   const lines = [`${sum.title} workout · ${dateLabel}`];
-  const stats = [sum.duration && fmtDuration(sum.duration), `${sum.setCount} sets`, `${sum.reps} reps`, sum.volume > 0 && `${fmtVolume(sum.volume)} ${sum.units} lifted`];
+  const stats = [
+    sum.duration && fmtDuration(sum.duration),
+    `${sum.setCount} sets`,
+    `${sum.reps} reps`,
+    sum.volume > 0 && `${fmtVolume(sum.volume)} ${sum.units} lifted`,
+  ];
   lines.push(stats.filter(Boolean).join(" · "));
-  if (sum.squat.sets.length) lines.push(`Back squat: ${sum.squat.sets.map(fmtSet).join(", ")}${sum.squat.top?.rpe ? ` (top set RPE ${sum.squat.top.rpe})` : ""}`);
+  if (sum.squat.sets.length)
+    lines.push(`Back squat: ${sum.squat.sets.map(fmtSet).join(", ")}${sum.squat.top?.rpe ? ` (top set RPE ${sum.squat.top.rpe})` : ""}`);
   for (const l of sum.lifts) lines.push(`${l.name}: ${l.sets.map(fmtSet).join(", ")}`);
   if (sum.notes) lines.push(`Notes: ${sum.notes}`);
   return lines.join("\n");
 }
 
-export default function SessionSummary({ state, dateKey, day, title, onClose }) {
+export default function SessionSummary({ state, dateKey, day, title, onEditTime, onClose }) {
   const [copied, setCopied] = useState(false);
   const sum = summarize(state, dateKey, { ...day, title });
   const dateLabel = fromKey(dateKey).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
@@ -116,6 +123,16 @@ export default function SessionSummary({ state, dateKey, day, title, onClose }) 
             {sum.volume > 0 && <div className={styles.subtitle}>{units} (weight × reps)</div>}
           </div>
         </div>
+
+        <section className={styles.card}>
+          <WorkoutTime
+            key={`${day.startedAt}-${day.finishedAt}`}
+            dateKey={dateKey}
+            startedAt={day.startedAt}
+            finishedAt={day.finishedAt}
+            onSave={onEditTime}
+          />
+        </section>
 
         <section className={`${styles.card} ${styles.squatCard}`}>
           <div className={`${styles.row} ${styles.between}`}>
