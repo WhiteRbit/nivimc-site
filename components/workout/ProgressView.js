@@ -3,7 +3,7 @@
 import { useState } from "react";
 import styles from "./workout.module.css";
 import { DAY_NAMES, fromKey, shiftDate, squatTop, toKey, weekdayOf } from "@/lib/workout/program";
-import { REGIONS, weeklyVolume } from "@/lib/workout/muscles";
+import { REGIONS, heatLevel as level, weeklyVolume } from "@/lib/workout/muscles";
 import MuscleMap, { HeatLegend } from "./MuscleMap";
 import { dayHasActivity } from "@/lib/workout/log";
 import { EXERCISE_BY_ID } from "@/lib/workout/exercises";
@@ -94,7 +94,6 @@ export default function ProgressView({ state, openDay }) {
 }
 
 // Sets per muscle over the last 7 days (secondary muscles count half a set).
-const level = (sets) => (sets <= 0 ? 0 : sets < 4 ? 1 : sets < 8 ? 2 : sets < 12 ? 3 : 4);
 
 function WeeklyMuscles({ logs }) {
   const today = toKey(new Date());
