@@ -7,6 +7,7 @@ import HowTo from "./HowTo";
 import ExercisePicker from "./ExercisePicker";
 import SwapSheet from "./SwapSheet";
 import WorkoutPicker from "./WorkoutPicker";
+import SessionSummary from "./SessionSummary";
 import MuscleMap, { MapLegend } from "./MuscleMap";
 import { EXERCISE_BY_ID, groupLabel } from "@/lib/workout/exercises";
 import {
@@ -26,6 +27,7 @@ export default function TodayView({ state, update, dateKey, setDateKey, todayKey
   const [picker, setPicker] = useState(false); // add-exercise list open
   const [swapIndex, setSwapIndex] = useState(null); // exercise being swapped
   const [choosing, setChoosing] = useState(false); // change-workout sheet open
+  const [summaryOpen, setSummaryOpen] = useState(false); // end-of-session summary
   const day = viewDay(state, dateKey);
   const weekday = weekdayOf(dateKey);
   const planDay = state.plan[weekday] || { title: "Rest", items: [] };
@@ -137,12 +139,31 @@ export default function TodayView({ state, update, dateKey, setDateKey, todayKey
         />
       </div>
 
-      <button
-        className={`${styles.btn} ${styles.btnBlock} ${day.completed ? "" : styles.btnPrimary}`}
-        onClick={() => edit((d) => (d.completed = !d.completed))}
-      >
-        {day.completed ? "✓ Workout complete — tap to reopen" : "Finish workout"}
-      </button>
+      {day.completed ? (
+        <div className={styles.row}>
+          <button className={`${styles.btn} ${styles.btnPrimary} ${styles.grow}`} onClick={() => setSummaryOpen(true)}>
+            ✓ Done · View summary
+          </button>
+          <button className={`${styles.btn} ${styles.btnGhost}`} onClick={() => edit((d) => (d.completed = false))}>
+            Reopen
+          </button>
+        </div>
+      ) : (
+        <button
+          className={`${styles.btn} ${styles.btnBlock} ${styles.btnPrimary}`}
+          onClick={() => {
+            edit((d) => {
+              d.completed = true;
+              d.finishedAt = Date.now();
+            });
+            setSummaryOpen(true);
+          }}
+        >
+          Finish workout
+        </button>
+      )}
+
+      {summaryOpen && <SessionSummary state={state} dateKey={dateKey} day={day} title={title} onClose={() => setSummaryOpen(false)} />}
 
       {picker && (
         <ExercisePicker
