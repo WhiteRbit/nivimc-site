@@ -7,7 +7,7 @@ import WeekView from "./WeekView";
 import ProgressView from "./ProgressView";
 import LibraryView from "./LibraryView";
 import SettingsView from "./SettingsView";
-import { RestTimer, useInstallPrompt, useRestTimer, useWakeLock } from "./PhoneTools";
+import { RestTimer, useInstallPrompt, useRestTimer, useUpdateCheck, useWakeLock } from "./PhoneTools";
 import { DEFAULT_PLAN, DEFAULT_SETTINGS, PLAN_VERSION, migratePlan, squatStreak, toKey } from "@/lib/workout/program";
 
 const STORAGE_KEY = "nivimc-workout-v1";
@@ -54,6 +54,7 @@ export default function WorkoutApp() {
   const [rest, startRest, setRest, audioRef] = useRestTimer();
   const wake = useWakeLock();
   const installer = useInstallPrompt();
+  const updateAvailable = useUpdateCheck();
 
   useEffect(() => {
     try {
@@ -91,6 +92,16 @@ export default function WorkoutApp() {
         </div>
       </header>
 
+      {updateAvailable && (
+        <button
+          className={`${styles.btn} ${styles.btnPrimary} ${styles.btnBlock}`}
+          style={{ marginBottom: 12 }}
+          onClick={() => window.location.reload()}
+        >
+          ↻ New version available · Update
+        </button>
+      )}
+
       {(wake.supported || installer.canInstall) && (
         <div className={styles.row} style={{ marginBottom: 12 }}>
           {wake.supported && (
@@ -124,21 +135,12 @@ export default function WorkoutApp() {
       </nav>
 
       {tab === "today" && (
-        <TodayView
-          state={state}
-          update={update}
-          dateKey={dateKey}
-          setDateKey={setDateKey}
-          todayKey={todayKey}
-          onSetDone={onSetDone}
-        />
+        <TodayView state={state} update={update} dateKey={dateKey} setDateKey={setDateKey} todayKey={todayKey} onSetDone={onSetDone} />
       )}
       {tab === "week" && <WeekView state={state} update={update} todayKey={todayKey} openDay={openDay} />}
       {tab === "progress" && <ProgressView state={state} openDay={openDay} />}
       {tab === "library" && <LibraryView state={state} update={update} />}
-      {tab === "settings" && (
-        <SettingsView state={state} update={update} reset={() => setState(freshState())} installer={installer} />
-      )}
+      {tab === "settings" && <SettingsView state={state} update={update} reset={() => setState(freshState())} installer={installer} />}
 
       {rest && <RestTimer key={rest.endsAt - rest.total * 1000} rest={rest} setRest={setRest} audioRef={audioRef} />}
     </div>
