@@ -166,3 +166,37 @@ export function useInstallPrompt() {
 
   return { canInstall: Boolean(promptEvent), installed, install };
 }
+
+// ------------------------------------------------------- Update check
+
+const scriptPaths = (html) => new Set(html.match(/\/_next\/static\/[^"'\s]+\.js/g) ?? []);
+
+// Home-screen apps often resume the page already in memory instead of reloading, so a
+// newly published version never shows. When the app opens or comes back to the screen,
+// compare this page's build scripts with the live ones and report when they differ.
+export function useUpdateCheck() {
+  const [available, setAvailable] = useState(false);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production") return;
+    let last = 0;
+    const check = async () => {
+      if (document.visibilityState !== "visible" || Date.now() - last < 60000) return;
+      last = Date.now();
+      try {
+        const res = await fetch(window.location.pathname, { cache: "no-store" });
+        if (!res.ok) return;
+        const live = scriptPaths(await res.text());
+        const loaded = new Set(Array.from(document.scripts, (s) => (s.src ? new URL(s.src).pathname : "")));
+        if (live.size && [...live].some((p) => !loaded.has(p))) setAvailable(true);
+      } catch {
+        // offline — try again next time
+      }
+    };
+    check();
+    document.addEventListener("visibilitychange", check);
+    return () => document.removeEventListener("visibilitychange", check);
+  }, []);
+
+  return available;
+}
