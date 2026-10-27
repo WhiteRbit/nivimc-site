@@ -709,3 +709,25 @@
   font-size: 0.75rem;
   color: var(--muted);
 }
+
+/* "Moved to tomorrow" banner with undo */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 120px;
+  transform: translateX(-50%);
+  width: calc(100% - 24px);
+  max-width: 560px;
+  z-index: 71;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: #1f1f1f;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+  font-size: 0.9rem;
+  font-weight: 600;
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import styles from "./workout.module.css";
 import SetTable, { toggleSet } from "./SetTable";
 import HowTo from "./HowTo";
@@ -21,7 +21,7 @@ import {
   suggestTarget,
   weekdayOf,
 } from "@/lib/workout/program";
-import { lastPerformance, newSet, snapshotFromWeekday, viewDay, withDay } from "@/lib/workout/log";
+import { lastPerformance, newSet, postponeExercises, snapshotFromWeekday, viewDay, withDay } from "@/lib/workout/log";
 import { musclesFor } from "@/lib/workout/muscles";
 
 export default function TodayView({ state, update, dateKey, setDateKey, todayKey, onSetDone }) {
@@ -29,6 +29,7 @@ export default function TodayView({ state, update, dateKey, setDateKey, todayKey
   const [swapIndex, setSwapIndex] = useState(null); // exercise being swapped
   const [choosing, setChoosing] = useState(false); // change-workout sheet open
   const [summaryOpen, setSummaryOpen] = useState(false); // end-of-session summary
+  const [undo, setUndo] = useState(null); // { prev, message } after moving exercises to tomorrow
   const day = viewDay(state, dateKey);
   const weekday = weekdayOf(dateKey);
   const planDay = state.plan[weekday] || { title: "Rest", items: [] };
@@ -54,6 +55,25 @@ export default function TodayView({ state, update, dateKey, setDateKey, todayKey
     });
     setChoosing(false);
   };
+
+  const nextKey = shiftDate(dateKey, 1);
+  const nextLabel = DAY_NAMES[weekdayOf(nextKey)];
+  const unfinished = day.exercises.map((e, i) => (e.sets.some((x) => !x.done) ? i : -1)).filter((i) => i >= 0);
+
+  // Push unfinished sets to the next day; keeps the previous state so the move can be undone.
+  const postpone = (indexes) => {
+    const { state: next, moved } = postponeExercises(state, dateKey, indexes, nextKey, (id) => EXERCISE_BY_ID[id]?.name ?? id);
+    if (!moved.length) return;
+    const prev = state;
+    update(() => next);
+    setUndo({ prev, message: `Moved ${moved.length > 1 ? `${moved.length} exercises` : moved[0]} to ${nextLabel}` });
+  };
+
+  useEffect(() => {
+    if (!undo) return;
+    const t = setTimeout(() => setUndo(null), 8000);
+    return () => clearTimeout(t);
+  }, [undo]);
 
   // Manually entered workout time (e.g. when logging a session afterwards).
   const setTime = (startedAt, finishedAt) =>
@@ -129,6 +149,9 @@ export default function TodayView({ state, update, dateKey, setDateKey, todayKey
           last={lastPerformance(state.logs, ex.exId, dateKey)}
           edit={edit}
           onSwap={() => setSwapIndex(index)}
+          onPostpone={() => postpone([index])}
+          nextLabel={nextLabel}
+          dayLabel={(k) => DAY_NAMES[weekdayOf(k)]}
           onSetDone={onSetDone}
         />
       ))}
@@ -157,6 +180,31 @@ export default function TodayView({ state, update, dateKey, setDateKey, todayKey
           onChange={(e) => edit((d) => (d.notes = e.target.value))}
         />
       </div>
+
+      {unfinished.length > 0 && day.exercises.length > 0 && (
+        <button
+          className={`${styles.btn} ${styles.btnGhost} ${styles.btnBlock}`}
+          style={{ marginBottom: 8 }}
+          onClick={() => postpone(unfinished)}
+        >
+          → Move unfinished exercises to {nextLabel}
+        </button>
+      )}
+
+      {undo && (
+        <div className={styles.toast} role="status">
+          <span>{undo.message}</span>
+          <button
+            className={`${styles.btn} ${styles.btnSmall}`}
+            onClick={() => {
+              update(() => undo.prev);
+              setUndo(null);
+            }}
+          >
+            Undo
+          </button>
+        </div>
+      )}
 
       {day.completed ? (
         <div className={styles.row}>
@@ -358,7 +406,7 @@ function SquatBlock({ state, day, dateKey, edit, onSetDone }) {
 
 // ------------------------------------------------------------- Exercises
 
-function ExerciseCard({ ex, index, units, last, edit, onSwap, onSetDone }) {
+function ExerciseCard({ ex, index, units, last, edit, onSwap, onSetDone, onPostpone, nextLabel, dayLabel }) {
   const info = EXERCISE_BY_ID[ex.exId];
   const allDone = ex.sets.length > 0 && ex.sets.every((s) => s.done);
 
@@ -375,6 +423,8 @@ function ExerciseCard({ ex, index, units, last, edit, onSwap, onSetDone }) {
             <span className={`${styles.pill} ${styles.pillAccent}`}>
               {ex.targetSets} × {ex.targetReps}
             </span>
+            {ex.carriedFrom && <span className={styles.pill}>↪ From {dayLabel(ex.carriedFrom)}</span>}
+            {ex.movedTo && <span className={styles.pill}>Rest moved to {dayLabel(ex.movedTo)}</span>}
           </div>
           {last && <p style={{ marginTop: 6 }}>Last time: {last.sets.map((s) => `${s.weight || "BW"}×${s.reps || "?"}`).join(", ")}</p>}
         </div>
@@ -397,6 +447,11 @@ function ExerciseCard({ ex, index, units, last, edit, onSwap, onSetDone }) {
 
       <div className={styles.row} style={{ marginTop: 10 }}>
         <HowTo exercise={info} />
+        {!allDone && (
+          <button className={`${styles.btn} ${styles.btnSmall}`} onClick={onPostpone} title={`Do the unfinished sets on ${nextLabel}`}>
+            → {nextLabel}
+          </button>
+        )}
         <button
           className={`${styles.btn} ${styles.btnGhost} ${styles.btnSmall}`}
           onClick={() => edit((d) => d.exercises[index].sets.push(newSet()))}
