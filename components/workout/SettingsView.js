@@ -6,6 +6,7 @@ import { isIOS } from "./PhoneTools";
 import { PLAN_VERSION, convertUnits, migratePlan } from "@/lib/workout/program";
 
 const NUMBER_FIELDS = [
+  { key: "bodyWeight", label: "Your body weight (for calorie estimates)", unit: true },
   { key: "startingTop", label: "Starting top-set weight (first day)", unit: true },
   { key: "barWeight", label: "Empty bar weight", unit: true },
   { key: "increment", label: "Progression step (and plate rounding)", unit: true },

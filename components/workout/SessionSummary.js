@@ -6,7 +6,7 @@ import MuscleMap, { HeatLegend } from "./MuscleMap";
 import WorkoutTime, { fmtDuration } from "./WorkoutTime";
 import { EXERCISE_BY_ID } from "@/lib/workout/exercises";
 import { heatLevel, weeklyVolume } from "@/lib/workout/muscles";
-import { fromKey, lastTopSet, squatTop } from "@/lib/workout/program";
+import { estimateCalories, fromKey, lastTopSet, squatTop } from "@/lib/workout/program";
 
 const num = (v) => {
   const n = Number(String(v ?? "").match(/\d+(\.\d+)?/)?.[0]);
@@ -33,10 +33,13 @@ export function summarize(state, dateKey, day) {
     .filter((k) => k < dateKey)
     .reduce((m, k) => Math.max(m, squatTop(state.logs[k]?.squat)?.weight ?? 0), 0);
 
+  const duration = day.startedAt && day.finishedAt && day.finishedAt > day.startedAt ? day.finishedAt - day.startedAt : null;
+
   return {
     units,
     title: day.title,
-    duration: day.startedAt && day.finishedAt && day.finishedAt > day.startedAt ? day.finishedAt - day.startedAt : null,
+    duration,
+    calories: estimateCalories(duration, state.settings.bodyWeight, units),
     setCount: allSets.length,
     reps,
     volume,
@@ -57,6 +60,7 @@ function shareText(sum, dateLabel) {
   const lines = [`${sum.title} workout · ${dateLabel}`];
   const stats = [
     sum.duration && fmtDuration(sum.duration),
+    sum.calories && `~${sum.calories} kcal`,
     `${sum.setCount} sets`,
     `${sum.reps} reps`,
     sum.volume > 0 && `${fmtVolume(sum.volume)} ${sum.units} lifted`,
@@ -69,7 +73,7 @@ function shareText(sum, dateLabel) {
   return lines.join("\n");
 }
 
-export default function SessionSummary({ state, dateKey, day, title, onEditTime, onClose }) {
+export default function SessionSummary({ state, dateKey, day, title, onEditTime, onSetBodyWeight, onClose }) {
   const [copied, setCopied] = useState(false);
   const sum = summarize(state, dateKey, { ...day, title });
   const dateLabel = fromKey(dateKey).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
@@ -123,6 +127,8 @@ export default function SessionSummary({ state, dateKey, day, title, onEditTime,
             {sum.volume > 0 && <div className={styles.subtitle}>{units} (weight × reps)</div>}
           </div>
         </div>
+
+        <Calories sum={sum} onSetBodyWeight={onSetBodyWeight} />
 
         <section className={styles.card}>
           <WorkoutTime
@@ -202,5 +208,50 @@ export default function SessionSummary({ state, dateKey, day, title, onEditTime,
         </button>
       </div>
     </div>
+  );
+}
+
+// Estimated calories, or what's missing to work them out.
+function Calories({ sum, onSetBodyWeight }) {
+  const [bw, setBw] = useState("");
+  return (
+    <section className={styles.card}>
+      <div className={`${styles.row} ${styles.between}`}>
+        <div className={styles.label}>Calories burned</div>
+        {sum.calories != null && <span className={styles.subtitle}>estimate</span>}
+      </div>
+      {sum.calories != null ? (
+        <>
+          <div className={styles.statNum} style={{ marginTop: 4 }}>
+            ~{sum.calories} <span className={styles.subtitle}>kcal</span>
+          </div>
+          <p style={{ marginTop: 4 }}>Based on your body weight and workout time (weight training ≈ 5 METs).</p>
+        </>
+      ) : !sum.duration ? (
+        <p style={{ marginTop: 6 }}>Set the workout time below to see an estimate.</p>
+      ) : (
+        <>
+          <p style={{ marginTop: 6 }}>Add your body weight to estimate calories.</p>
+          <div className={styles.row} style={{ marginTop: 8 }}>
+            <input
+              className={`${styles.input} ${styles.num}`}
+              inputMode="decimal"
+              placeholder={sum.units === "lb" ? "180" : "80"}
+              value={bw}
+              onChange={(e) => setBw(e.target.value.replace(/[^\d.]/g, ""))}
+              aria-label="Body weight"
+            />
+            <span className={styles.subtitle}>{sum.units}</span>
+            <button
+              className={`${styles.btn} ${styles.btnPrimary} ${styles.btnSmall}`}
+              disabled={!(Number(bw) > 0)}
+              onClick={() => onSetBodyWeight(bw)}
+            >
+              Save
+            </button>
+          </div>
+        </>
+      )}
+    </section>
   );
 }
