@@ -731,3 +731,120 @@
   font-size: 0.9rem;
   font-weight: 600;
 }
+
+/* Today flow: step indicator */
+.stepper {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.step:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.stepNum {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  font-size: 0.75rem;
+}
+
+.stepOn {
+  border-color: var(--accent);
+  color: var(--text);
+  background: var(--accent-soft);
+}
+
+.stepOn .stepNum {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Plan step */
+.liftRow {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.suggestion {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.suggestion:last-child {
+  border-bottom: 0;
+}
+
+.bigCheck {
+  width: 24px;
+  height: 24px;
+  margin-top: 18px;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
+
+.exSelect {
+  width: 100%;
+  margin-top: 4px;
+  font-weight: 700;
+}
+
+.thumb {
+  width: 84px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+  margin-top: 16px;
+}
+
+.stickyCta {
+  position: sticky;
+  bottom: 52px;
+  z-index: 20;
+  padding: 10px 0;
+  background: linear-gradient(180deg, transparent, #000 35%);
+}
+
+@media (display-mode: standalone) {
+  .stickyCta {
+    bottom: calc(env(safe-area-inset-bottom) + 4px);
+  }
+}
+
+.orderBtns {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.orderBtns .btn {
+  min-height: 32px;
+  padding: 2px 8px;
+}

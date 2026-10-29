@@ -6,7 +6,7 @@ import MuscleMap, { HeatLegend } from "./MuscleMap";
 import WorkoutTime, { fmtDuration } from "./WorkoutTime";
 import { EXERCISE_BY_ID } from "@/lib/workout/exercises";
 import { heatLevel, weeklyVolume } from "@/lib/workout/muscles";
-import { estimateCalories, fromKey, lastTopSet, squatTop } from "@/lib/workout/program";
+import { LIFTS, estimateCalories, fromKey, lastTopSet, squatTop } from "@/lib/workout/program";
 
 const num = (v) => {
   const n = Number(String(v ?? "").match(/\d+(\.\d+)?/)?.[0]);
@@ -19,19 +19,29 @@ const fmtVolume = (v) => (v >= 10000 ? `${(v / 1000).toFixed(1)}k` : Math.round(
 // Everything the person did in one session, shown when they finish it.
 export function summarize(state, dateKey, day) {
   const units = state.settings.units;
-  const squatSets = done(day.squat.sets);
+  // Daily pyramid lifts (squat, deadlift) with their top set and change vs the last heavy day.
+  const pyramids = LIFTS.map((l) => {
+    const log = day[l.key] ?? { sets: [] };
+    const top = squatTop(log);
+    const before = lastTopSet(state.logs, dateKey, l.key);
+    const bestBefore = Object.keys(state.logs)
+      .filter((k) => k < dateKey)
+      .reduce((m, k) => Math.max(m, squatTop(state.logs[k]?.[l.key])?.weight ?? 0), 0);
+    return {
+      ...l,
+      sets: done(log.sets),
+      top,
+      light: log.light,
+      change: top && before ? top.weight - before.weight : null,
+      pr: top && top.weight > bestBefore && bestBefore > 0,
+    };
+  }).filter((p) => p.key === "squat" || p.sets.length);
   const lifts = day.exercises
     .map((e) => ({ exId: e.exId, name: EXERCISE_BY_ID[e.exId]?.name ?? e.exId, sets: done(e.sets) }))
     .filter((e) => e.sets.length);
-  const allSets = [...squatSets, ...lifts.flatMap((e) => e.sets)];
+  const allSets = [...pyramids.flatMap((p) => p.sets), ...lifts.flatMap((e) => e.sets)];
   const volume = allSets.reduce((sum, s) => sum + num(s.weight) * num(s.reps), 0);
   const reps = allSets.reduce((sum, s) => sum + num(s.reps), 0);
-
-  const top = squatTop(day.squat);
-  const before = lastTopSet(state.logs, dateKey);
-  const bestBefore = Object.keys(state.logs)
-    .filter((k) => k < dateKey)
-    .reduce((m, k) => Math.max(m, squatTop(state.logs[k]?.squat)?.weight ?? 0), 0);
 
   const duration = day.startedAt && day.finishedAt && day.finishedAt > day.startedAt ? day.finishedAt - day.startedAt : null;
 
@@ -43,13 +53,7 @@ export function summarize(state, dateKey, day) {
     setCount: allSets.length,
     reps,
     volume,
-    squat: {
-      sets: squatSets,
-      top,
-      light: day.squat.light,
-      change: top && before ? top.weight - before.weight : null,
-      pr: top && top.weight > bestBefore && bestBefore > 0,
-    },
+    pyramids,
     lifts,
     muscles: weeklyVolume({ [dateKey]: day }, [dateKey]),
     notes: day.notes,
@@ -66,14 +70,14 @@ function shareText(sum, dateLabel) {
     sum.volume > 0 && `${fmtVolume(sum.volume)} ${sum.units} lifted`,
   ];
   lines.push(stats.filter(Boolean).join(" · "));
-  if (sum.squat.sets.length)
-    lines.push(`Back squat: ${sum.squat.sets.map(fmtSet).join(", ")}${sum.squat.top?.rpe ? ` (top set RPE ${sum.squat.top.rpe})` : ""}`);
+  for (const p of sum.pyramids)
+    if (p.sets.length) lines.push(`${p.name}: ${p.sets.map(fmtSet).join(", ")}${p.top?.rpe ? ` (top set RPE ${p.top.rpe})` : ""}`);
   for (const l of sum.lifts) lines.push(`${l.name}: ${l.sets.map(fmtSet).join(", ")}`);
   if (sum.notes) lines.push(`Notes: ${sum.notes}`);
   return lines.join("\n");
 }
 
-export default function SessionSummary({ state, dateKey, day, title, onEditTime, onSetBodyWeight, onClose }) {
+export default function SessionSummary({ state, dateKey, day, title, onEditTime, onSetBodyWeight, onBack }) {
   const [copied, setCopied] = useState(false);
   const sum = summarize(state, dateKey, { ...day, title });
   const dateLabel = fromKey(dateKey).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" });
@@ -94,18 +98,13 @@ export default function SessionSummary({ state, dateKey, day, title, onEditTime,
   };
 
   return (
-    <div className={styles.backdrop} onClick={onClose} role="presentation">
-      <div className={styles.modal} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Workout summary">
-        <div className={`${styles.row} ${styles.between}`}>
-          <div>
-            <div className={styles.label}>Workout complete</div>
-            <h3 className={styles.h3}>
-              {sum.title} · {dateLabel}
-            </h3>
-          </div>
-          <button className={`${styles.btn} ${styles.btnSmall}`} onClick={onClose}>
-            Close
-          </button>
+    <div aria-label="Workout summary">
+      <div>
+        <div>
+          <div className={styles.label}>Workout complete 💪</div>
+          <h3 className={styles.h3}>
+            {sum.title} · {dateLabel}
+          </h3>
         </div>
 
         <div className={styles.stats} style={{ marginTop: 12, gridTemplateColumns: "repeat(2, 1fr)" }}>
@@ -140,31 +139,36 @@ export default function SessionSummary({ state, dateKey, day, title, onEditTime,
           />
         </section>
 
-        <section className={`${styles.card} ${styles.squatCard}`}>
-          <div className={`${styles.row} ${styles.between}`}>
-            <div className={styles.label}>Back squat{sum.squat.light ? " · light day" : ""}</div>
-            {sum.squat.pr && <span className={`${styles.pill} ${styles.pillOk}`}>🏆 New best</span>}
-          </div>
-          {sum.squat.sets.length ? (
-            <>
-              <p style={{ marginTop: 6, color: "var(--text)" }}>{sum.squat.sets.map(fmtSet).join(" → ")}</p>
-              {sum.squat.top && !sum.squat.light && (
-                <p style={{ marginTop: 4 }}>
-                  Top set {sum.squat.top.weight} {units} × {sum.squat.top.reps}
-                  {sum.squat.top.rpe ? ` at RPE ${sum.squat.top.rpe}` : ""}
-                  {sum.squat.change != null &&
-                    (sum.squat.change > 0
-                      ? ` · +${sum.squat.change} ${units} on last time`
-                      : sum.squat.change < 0
-                        ? ` · ${sum.squat.change} ${units} on last time`
-                        : " · same as last time")}
-                </p>
-              )}
-            </>
-          ) : (
-            <p style={{ marginTop: 6 }}>No squat sets ticked off today.</p>
-          )}
-        </section>
+        {sum.pyramids.map((p) => (
+          <section key={p.key} className={`${styles.card} ${styles.squatCard}`}>
+            <div className={`${styles.row} ${styles.between}`}>
+              <div className={styles.label}>
+                {p.name}
+                {p.light ? " · light day" : ""}
+              </div>
+              {p.pr && <span className={`${styles.pill} ${styles.pillOk}`}>🏆 New best</span>}
+            </div>
+            {p.sets.length ? (
+              <>
+                <p style={{ marginTop: 6, color: "var(--text)" }}>{p.sets.map(fmtSet).join(" → ")}</p>
+                {p.top && !p.light && (
+                  <p style={{ marginTop: 4 }}>
+                    Top set {p.top.weight} {units} × {p.top.reps}
+                    {p.top.rpe ? ` at RPE ${p.top.rpe}` : ""}
+                    {p.change != null &&
+                      (p.change > 0
+                        ? ` · +${p.change} ${units} on last time`
+                        : p.change < 0
+                          ? ` · ${p.change} ${units} on last time`
+                          : " · same as last time")}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p style={{ marginTop: 6 }}>No sets ticked off today.</p>
+            )}
+          </section>
+        ))}
 
         <section className={styles.card}>
           <div className={styles.label}>Exercises</div>
@@ -205,6 +209,9 @@ export default function SessionSummary({ state, dateKey, day, title, onEditTime,
 
         <button className={`${styles.btn} ${styles.btnPrimary} ${styles.btnBlock}`} onClick={share}>
           {copied ? "Copied ✓" : "Share summary"}
+        </button>
+        <button className={`${styles.btn} ${styles.btnGhost} ${styles.btnBlock}`} style={{ marginTop: 8 }} onClick={onBack}>
+          ← Back to workout (add or fix sets)
         </button>
       </div>
     </div>
