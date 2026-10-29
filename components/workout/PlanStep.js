@@ -6,7 +6,7 @@ import HowTo from "./HowTo";
 import MuscleMap from "./MuscleMap";
 import { liftPlan, liftSkipped } from "./LiftBlock";
 import { ACTIVE_EXERCISES, EXERCISE_BY_ID } from "@/lib/workout/exercises";
-import { ANGLES, suggestFor } from "@/lib/workout/angles";
+import { suggestFor } from "@/lib/workout/angles";
 import { REGIONS, musclesFor } from "@/lib/workout/muscles";
 import { photosFor } from "@/lib/workout/photos";
 import { LIFTS } from "@/lib/workout/program";
@@ -20,6 +20,7 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
   const [regions, setRegions] = useState([]); // tapped muscles, in tap order
   const [choice, setChoice] = useState({}); // row key → chosen exercise id
   const [on, setOn] = useState({}); // row key → ticked
+  const [extra, setExtra] = useState([]); // other exercises ticked from a muscle's full list
   const units = state.settings.units;
 
   const inWorkout = day.exercises.map((e) => e.exId);
@@ -27,6 +28,11 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
   const pick = (r) => choice[r.key] ?? r.exId;
   const isOn = (r) => (on[r.key] ?? r.on) && Boolean(pick(r));
   const chosen = rows.filter(isOn);
+  const picked = new Set([...inWorkout, ...rows.map(pick).filter(Boolean)]);
+  // Every other exercise that mainly works the muscle, so nothing is hidden.
+  const othersFor = (region) => ACTIVE_EXERCISES.filter((e) => musclesFor(e.id).primary.includes(region) && !picked.has(e.id));
+  const extraChosen = extra.filter((id) => !picked.has(id));
+  const total = chosen.length + extraChosen.length;
 
   const toggleRegion = (r) => setRegions((cur) => (cur.includes(r) ? cur.filter((x) => x !== r) : [...cur, r]));
 
@@ -39,12 +45,16 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
         if (d.exercises.some((e) => e.exId === exId)) continue;
         d.exercises.push({ exId, targetSets: 3, targetReps: r.angle.reps, sets: [newSet(), newSet(), newSet()] });
       }
+      for (const exId of extraChosen) {
+        if (!d.exercises.some((e) => e.exId === exId)) d.exercises.push({ exId, targetSets: 3, targetReps: "10-12", sets: [newSet(), newSet(), newSet()] });
+      }
       if (!d.title && regions.length) d.title = regions.map((r) => REGIONS[r]).join(" + ");
       d.stage = "workout";
     });
     setRegions([]);
     setChoice({});
     setOn({});
+    setExtra([]);
     onStart();
   };
 
@@ -142,7 +152,9 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
         <section key={region} className={styles.card}>
           <div className={`${styles.row} ${styles.between}`}>
             <h3 className={styles.h3}>{REGIONS[region]}</h3>
-            <span className={styles.subtitle}>{(ANGLES[region] ?? []).length} angles</span>
+            <span className={styles.subtitle}>
+              {ACTIVE_EXERCISES.filter((e) => musclesFor(e.id).primary.includes(region)).length} exercises
+            </span>
           </div>
           <p style={{ marginTop: 2 }}>Suggested to cover the whole muscle. Change any of them or untick what you don&apos;t want.</p>
           <ul className={styles.list} style={{ marginTop: 6 }}>
@@ -162,6 +174,23 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
                 />
               ))}
           </ul>
+          {othersFor(region).length > 0 && (
+            <>
+              <div className={styles.label} style={{ marginTop: 14 }}>
+                All other {REGIONS[region].toLowerCase()} exercises
+              </div>
+              <ul className={styles.list} style={{ marginTop: 4 }}>
+                {othersFor(region).map((e) => (
+                  <ExtraRow
+                    key={e.id}
+                    exercise={e}
+                    checked={extra.includes(e.id)}
+                    onCheck={(v) => setExtra((cur) => (v ? [...cur, e.id] : cur.filter((x) => x !== e.id)))}
+                  />
+                ))}
+              </ul>
+            </>
+          )}
         </section>
       ))}
 
@@ -173,9 +202,9 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
       )}
 
       <div className={styles.stickyCta}>
-        {chosen.length > 0 ? (
+        {total > 0 ? (
           <button className={`${styles.btn} ${styles.btnPrimary} ${styles.btnBlock}`} onClick={add}>
-            Add {chosen.length} exercise{chosen.length > 1 ? "s" : ""} to today&apos;s workout →
+            Add {total} exercise{total > 1 ? "s" : ""} to today&apos;s workout →
           </button>
         ) : (
           <button className={`${styles.btn} ${styles.btnPrimary} ${styles.btnBlock}`} onClick={add}>
@@ -247,6 +276,38 @@ function SuggestionRow({ row, exId, checked, onCheck, onChange }) {
           <HowTo exercise={info} />
         </div>
       )}
+    </li>
+  );
+}
+
+// A compact, untouched-by-default row for the rest of a muscle's exercises.
+function ExtraRow({ exercise, checked, onCheck }) {
+  const photo = photosFor(exercise.id)?.[0];
+  return (
+    <li className={styles.suggestion}>
+      <div className={styles.cardHead}>
+        <input
+          type="checkbox"
+          className={styles.bigCheck}
+          style={{ marginTop: 4 }}
+          checked={checked}
+          onChange={(e) => onCheck(e.target.checked)}
+          aria-label={`Include ${exercise.name}`}
+        />
+        <div className={styles.grow}>
+          <div style={{ fontWeight: 700 }}>{exercise.name}</div>
+          <div className={styles.muscles}>{exercise.muscles}</div>
+        </div>
+        {photo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={photo} alt="" className={styles.thumb} style={{ marginTop: 0 }} loading="lazy" />
+        ) : (
+          <MuscleMap {...musclesFor(exercise.id)} size="sm" />
+        )}
+      </div>
+      <div className={styles.row} style={{ marginTop: 6 }}>
+        <HowTo exercise={exercise} />
+      </div>
     </li>
   );
 }
