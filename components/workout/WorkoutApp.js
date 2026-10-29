@@ -84,7 +84,9 @@ export default function WorkoutApp() {
       <header className={styles.header}>
         <div>
           <h1 className={styles.title}>Squat Every Day</h1>
-          <div className={styles.subtitle}>Daily tracker · Strength Training Anatomy routines</div>
+          <div className={styles.subtitle}>
+            Daily tracker · Strength Training Anatomy routines · v{process.env.NEXT_PUBLIC_APP_VERSION}
+          </div>
         </div>
         <div className={styles.streak}>
           <span className={styles.streakNum}>{streak}</span>
