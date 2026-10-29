@@ -7,7 +7,8 @@ import { PLAN_VERSION, convertUnits, migratePlan } from "@/lib/workout/program";
 
 const NUMBER_FIELDS = [
   { key: "bodyWeight", label: "Your body weight (for calorie estimates)", unit: true },
-  { key: "startingTop", label: "Starting top-set weight (first day)", unit: true },
+  { key: "startingTop", label: "Squat starting top-set weight", unit: true },
+  { key: "deadliftStartingTop", label: "Deadlift starting top-set weight", unit: true },
   { key: "barWeight", label: "Empty bar weight", unit: true },
   { key: "increment", label: "Progression step (and plate rounding)", unit: true },
   { key: "startPct", label: "First pyramid set (% of top set)", suffix: "%" },
@@ -101,13 +102,12 @@ export default function SettingsView({ state, update, reset, installer }) {
           ))}
         </div>
         <p style={{ marginTop: 8 }}>
-          Switching converts everything: your logged weights, squat target, bar weight (20 kg ⇄ 45 lb) and progression step
-          (2.5 kg ⇄ 5 lb).
+          Switching converts everything: your logged weights, squat target, bar weight (20 kg ⇄ 45 lb) and progression step (2.5 kg ⇄ 5 lb).
         </p>
       </section>
 
       <section className={styles.card}>
-        <div className={styles.label}>Squat Every Day settings</div>
+        <div className={styles.label}>Daily pyramid lifts</div>
         <ul className={styles.list} style={{ marginTop: 4 }}>
           <li className={styles.listItem}>
             <span className={styles.grow} style={{ fontSize: "0.9rem" }}>
@@ -120,6 +120,12 @@ export default function SettingsView({ state, update, reset, installer }) {
               onChange={(e) => set("pyramidReps", e.target.value)}
               aria-label="Pyramid reps per set"
             />
+          </li>
+          <li className={styles.listItem}>
+            <label className={`${styles.toggle} ${styles.grow}`} style={{ fontSize: "0.9rem", color: "var(--text)" }}>
+              <input type="checkbox" checked={settings.dailyDeadlift !== false} onChange={(e) => set("dailyDeadlift", e.target.checked)} />
+              Include the deadlift pyramid every day
+            </label>
           </li>
           {NUMBER_FIELDS.map((f) => (
             <li key={f.key} className={styles.listItem}>
@@ -143,17 +149,17 @@ export default function SettingsView({ state, update, reset, installer }) {
           ))}
         </ul>
         <p style={{ marginTop: 8 }}>
-          The squat is a pyramid: the first set is light for the most reps, then every set adds weight and drops reps up
-          to the top set. Rate the top set after you finish: RPE 8 or easier → next heavy day adds one step. RPE 9 →
-          repeat the weight. RPE 10 → drop about 10% and rebuild.
+          The squat is a pyramid: the first set is light for the most reps, then every set adds weight and drops reps up to the top set.
+          Rate the top set after you finish: RPE 8 or easier → next heavy day adds one step. RPE 9 → repeat the weight. RPE 10 → drop about
+          10% and rebuild.
         </p>
       </section>
 
       <section className={styles.card}>
         <div className={styles.label}>Your data</div>
         <p style={{ marginTop: 6 }}>
-          Everything is saved in this browser only. Export a backup now and then, especially before clearing your browser or
-          switching phones.
+          Everything is saved in this browser only. Export a backup now and then, especially before clearing your browser or switching
+          phones.
         </p>
         <div className={styles.row} style={{ marginTop: 10 }}>
           <button className={styles.btn} onClick={exportData}>
@@ -188,11 +194,11 @@ export default function SettingsView({ state, update, reset, installer }) {
       </section>
 
       <p className={styles.note}>
-        Exercises, page numbers and form cues are drawn from Frédéric Delavier&apos;s <em>Strength Training Anatomy</em>{" "}
-        (Human Kinetics). Exercise photos come from the Free Exercise DB (github.com/yuhonas/free-exercise-db). The daily squat follows the idea of Cory Gregory&apos;s &quot;Squat Every Day&quot; program: squat every
-        day, pyramiding from light high-rep sets up to a clean heavy top set without grinding. The exact numbers here are this
-        app&apos;s defaults, not the official program — tune them to you. This is a tracker, not medical advice; stop if
-        something hurts.
+        Exercises, page numbers and form cues are drawn from Frédéric Delavier&apos;s <em>Strength Training Anatomy</em> (Human Kinetics).
+        Exercise photos come from the Free Exercise DB (github.com/yuhonas/free-exercise-db). The daily squat follows the idea of Cory
+        Gregory&apos;s &quot;Squat Every Day&quot; program: squat every day, pyramiding from light high-rep sets up to a clean heavy top set
+        without grinding. The exact numbers here are this app&apos;s defaults, not the official program — tune them to you. This is a
+        tracker, not medical advice; stop if something hurts.
       </p>
     </div>
   );
