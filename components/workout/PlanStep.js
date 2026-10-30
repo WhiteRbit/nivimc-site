@@ -11,6 +11,7 @@ import { REGIONS, musclesFor } from "@/lib/workout/muscles";
 import { photosFor } from "@/lib/workout/photos";
 import { LIFTS } from "@/lib/workout/program";
 import { newSet } from "@/lib/workout/log";
+import { buildWorkout } from "@/lib/workout/builder";
 
 const fmtPyramid = (sets) => sets.map((s) => `${s.weight}×${s.reps}`).join(" → ");
 
@@ -37,6 +38,36 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
   const toggleRegion = (r) => setRegions((cur) => (cur.includes(r) ? cur.filter((x) => x !== r) : [...cur, r]));
 
   const lightNow = LIFTS.map((l) => liftPlan(state, day, dateKey, l).isLight).some(Boolean);
+
+  // "Build it for me": fit the session into the minutes available.
+  const [minutes, setMinutes] = useState(null);
+  const built =
+    minutes &&
+    buildWorkout({
+      settings: state.settings,
+      logs: state.logs,
+      dateKey,
+      regions,
+      minutes,
+      taken: inWorkout,
+      lifts: LIFTS.map((l) => ({ ...l, light: liftPlan(state, day, dateKey, l).isLight, skipped: liftSkipped(state, day, l) })),
+    });
+
+  const useBuilt = () => {
+    edit((d) => {
+      if (built.skipDeadlift && !liftSkipped(state, day, LIFTS[1])) d.deadlift.skip = true;
+      for (const it of built.items) {
+        if (d.exercises.some((e) => e.exId === it.exId)) continue;
+        d.exercises.push({ exId: it.exId, targetSets: it.sets, targetReps: it.reps, sets: Array.from({ length: it.sets }, newSet) });
+      }
+      if (!d.title) d.title = built.regions.length ? built.regions.map((r) => REGIONS[r]).join(" + ") : "Daily lifts";
+      d.plannedMinutes = minutes;
+      d.stage = "workout";
+    });
+    setMinutes(null);
+    setRegions([]);
+    onStart();
+  };
 
   const add = () => {
     edit((d) => {
@@ -147,6 +178,60 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
         )}
       </section>
 
+      {/* ---------------------------------------------------------- Build for time */}
+      <section className={styles.card}>
+        <div className={styles.label}>⏱ Short on time? Let the app build it</div>
+        <p style={{ marginTop: 4 }}>
+          {regions.length
+            ? `Fits the pyramid lifts plus ${regions.map((r) => REGIONS[r]).join(" + ")} into the time you have.`
+            : "Pick muscles above, or let it choose the ones you've trained least this week."}
+        </p>
+        <div className={styles.row} style={{ marginTop: 8 }}>
+          {[20, 30, 45, 60, 75, 90].map((m) => (
+            <button
+              key={m}
+              className={`${styles.btn} ${styles.btnSmall} ${minutes === m ? styles.btnPrimary : ""}`}
+              onClick={() => setMinutes(minutes === m ? null : m)}
+              aria-pressed={minutes === m}
+            >
+              {m} min
+            </button>
+          ))}
+        </div>
+
+        {built && (
+          <div style={{ marginTop: 12 }}>
+            <ul className={styles.list}>
+              {built.lifts.map((l) => (
+                <li key={l.key} className={styles.listItem}>
+                  <span style={{ fontWeight: 700 }}>{l.name} pyramid</span>
+                  <span className={styles.subtitle}>~{l.minutes} min</span>
+                </li>
+              ))}
+              {built.items.map((it) => (
+                <li key={it.exId} className={styles.listItem}>
+                  <div className={styles.grow}>
+                    <div style={{ fontWeight: 700 }}>{EXERCISE_BY_ID[it.exId]?.name}</div>
+                    <div className={styles.muscles}>
+                      {REGIONS[it.region]} · {it.angle} · {it.sets} × {it.reps}
+                    </div>
+                  </div>
+                  <span className={styles.subtitle}>~{it.minutes} min</span>
+                </li>
+              ))}
+            </ul>
+            {built.notes.map((n) => (
+              <p key={n} style={{ marginTop: 6 }}>
+                {n}
+              </p>
+            ))}
+            <div style={{ fontWeight: 700, marginTop: 8 }}>
+              ~{built.total} of {minutes} min · tap the button below to use it, or pick a different time
+            </div>
+          </div>
+        )}
+      </section>
+
       {/* ---------------------------------------------------------- Suggestions */}
       {regions.map((region) => (
         <section key={region} className={styles.card}>
@@ -202,7 +287,11 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
       )}
 
       <div className={styles.stickyCta}>
-        {total > 0 ? (
+        {built ? (
+          <button className={`${styles.btn} ${styles.btnPrimary} ${styles.btnBlock}`} onClick={useBuilt}>
+            Use this {minutes}-min workout →
+          </button>
+        ) : total > 0 ? (
           <button className={`${styles.btn} ${styles.btnPrimary} ${styles.btnBlock}`} onClick={add}>
             Add {total} exercise{total > 1 ? "s" : ""} to today&apos;s workout →
           </button>
