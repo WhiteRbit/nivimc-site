@@ -3,6 +3,7 @@
 import { useState } from "react";
 import styles from "./workout.module.css";
 import HowTo from "./HowTo";
+import SwapSheet from "./SwapSheet";
 import MuscleMap from "./MuscleMap";
 import { liftPlan, liftSkipped } from "./LiftBlock";
 import { ACTIVE_EXERCISES, EXERCISE_BY_ID } from "@/lib/workout/exercises";
@@ -20,6 +21,8 @@ const fmtPyramid = (sets) => sets.map((s) => `${s.weight}×${s.reps}`).join(" �
 export default function PlanStep({ state, day, dateKey, edit, planned, onUseRoutine, onStart }) {
   const [regions, setRegions] = useState([]); // tapped muscles, in tap order
   const [choice, setChoice] = useState({}); // row key → chosen exercise id
+  const [switching, setSwitching] = useState(null); // { exId, preferred, onPick } while the switch sheet is open
+  const [builtSwap, setBuiltSwap] = useState({}); // built plan: suggested exercise id → switched-to id
   const [on, setOn] = useState({}); // row key → ticked
   const [extra, setExtra] = useState([]); // other exercises ticked from a muscle's full list
   const units = state.settings.units;
@@ -53,10 +56,12 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
       lifts: LIFTS.map((l) => ({ ...l, light: liftPlan(state, day, dateKey, l).isLight, skipped: liftSkipped(state, day, l) })),
     });
 
+  const builtItems = built ? built.items.map((it) => ({ ...it, exId: builtSwap[it.exId] ?? it.exId, suggested: it.exId })) : [];
+
   const useBuilt = () => {
     edit((d) => {
       if (built.skipDeadlift && !liftSkipped(state, day, LIFTS[1])) d.deadlift.skip = true;
-      for (const it of built.items) {
+      for (const it of builtItems) {
         if (d.exercises.some((e) => e.exId === it.exId)) continue;
         d.exercises.push({ exId: it.exId, targetSets: it.sets, targetReps: it.reps, sets: Array.from({ length: it.sets }, newSet) });
       }
@@ -66,6 +71,7 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
     });
     setMinutes(null);
     setRegions([]);
+    setBuiltSwap({});
     onStart();
   };
 
@@ -77,7 +83,8 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
         d.exercises.push({ exId, targetSets: 3, targetReps: r.angle.reps, sets: [newSet(), newSet(), newSet()] });
       }
       for (const exId of extraChosen) {
-        if (!d.exercises.some((e) => e.exId === exId)) d.exercises.push({ exId, targetSets: 3, targetReps: "10-12", sets: [newSet(), newSet(), newSet()] });
+        if (!d.exercises.some((e) => e.exId === exId))
+          d.exercises.push({ exId, targetSets: 3, targetReps: "10-12", sets: [newSet(), newSet(), newSet()] });
       }
       if (!d.title && regions.length) d.title = regions.map((r) => REGIONS[r]).join(" + ");
       d.stage = "workout";
@@ -208,15 +215,28 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
                   <span className={styles.subtitle}>~{l.minutes} min</span>
                 </li>
               ))}
-              {built.items.map((it) => (
-                <li key={it.exId} className={styles.listItem}>
+              {builtItems.map((it) => (
+                <li key={it.suggested} className={styles.listItem}>
                   <div className={styles.grow}>
                     <div style={{ fontWeight: 700 }}>{EXERCISE_BY_ID[it.exId]?.name}</div>
                     <div className={styles.muscles}>
-                      {REGIONS[it.region]} · {it.angle} · {it.sets} × {it.reps}
+                      {REGIONS[it.region]} · {it.angle} · {it.sets} × {it.reps} · ~{it.minutes} min
                     </div>
                   </div>
-                  <span className={styles.subtitle}>~{it.minutes} min</span>
+                  <button
+                    className={`${styles.btn} ${styles.btnSmall}`}
+                    onClick={() =>
+                      setSwitching({
+                        exId: it.exId,
+                        region: it.region,
+                        preferred: { label: it.angle, ids: it.options },
+                        exclude: builtItems.map((x) => x.exId),
+                        onPick: (id) => setBuiltSwap((m) => ({ ...m, [it.suggested]: id })),
+                      })
+                    }
+                  >
+                    ⇄ Switch
+                  </button>
                 </li>
               ))}
             </ul>
@@ -241,7 +261,9 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
               {ACTIVE_EXERCISES.filter((e) => musclesFor(e.id).primary.includes(region)).length} exercises
             </span>
           </div>
-          <p style={{ marginTop: 2 }}>Suggested to cover the whole muscle. Change any of them or untick what you don&apos;t want.</p>
+          <p style={{ marginTop: 2 }}>
+            Suggested to cover the whole muscle. Tap ⇄ Switch to swap one for another exercise for the same area, or untick it.
+          </p>
           <ul className={styles.list} style={{ marginTop: 6 }}>
             {rows
               .filter((r) => r.region === region)
@@ -252,10 +274,18 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
                   exId={pick(r)}
                   checked={isOn(r)}
                   onCheck={(v) => setOn((o) => ({ ...o, [r.key]: v }))}
-                  onChange={(id) => {
-                    setChoice((c) => ({ ...c, [r.key]: id }));
-                    setOn((o) => ({ ...o, [r.key]: true }));
-                  }}
+                  onSwitch={() =>
+                    setSwitching({
+                      exId: pick(r),
+                      region: r.region,
+                      preferred: { label: r.angle.label, ids: r.angle.options },
+                      exclude: [...inWorkout, ...rows.filter((x) => x.key !== r.key).map(pick)].filter(Boolean),
+                      onPick: (id) => {
+                        setChoice((c) => ({ ...c, [r.key]: id }));
+                        setOn((o) => ({ ...o, [r.key]: true }));
+                      },
+                    })
+                  }
                 />
               ))}
           </ul>
@@ -286,6 +316,20 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
         </section>
       )}
 
+      {switching && (
+        <SwapSheet
+          exId={switching.exId}
+          region={switching.region}
+          preferred={switching.preferred}
+          exclude={switching.exclude}
+          onClose={() => setSwitching(null)}
+          onPick={(id) => {
+            switching.onPick(id);
+            setSwitching(null);
+          }}
+        />
+      )}
+
       <div className={styles.stickyCta}>
         {built ? (
           <button className={`${styles.btn} ${styles.btnPrimary} ${styles.btnBlock}`} onClick={useBuilt}>
@@ -305,11 +349,9 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
   );
 }
 
-function SuggestionRow({ row, exId, checked, onCheck, onChange }) {
+function SuggestionRow({ row, exId, checked, onCheck, onSwitch }) {
   const info = EXERCISE_BY_ID[exId];
   const photo = exId ? photosFor(exId)?.[0] : null;
-  // The angle's own options first, then everything else that mainly works this muscle.
-  const others = ACTIVE_EXERCISES.filter((e) => !row.angle.options.includes(e.id) && musclesFor(e.id).primary.includes(row.region));
 
   return (
     <li className={styles.suggestion}>
@@ -325,31 +367,8 @@ function SuggestionRow({ row, exId, checked, onCheck, onChange }) {
           <div className={styles.label} style={{ letterSpacing: "0.04em" }}>
             {row.angle.label}
           </div>
-          <select
-            className={`${styles.select} ${styles.exSelect}`}
-            value={exId ?? ""}
-            onChange={(e) => onChange(e.target.value)}
-            aria-label={row.angle.label}
-          >
-            {!exId && <option value="">Choose…</option>}
-            <optgroup label="Best for this angle">
-              {row.angle.options.map((id) => (
-                <option key={id} value={id}>
-                  {EXERCISE_BY_ID[id]?.name}
-                </option>
-              ))}
-            </optgroup>
-            {others.length > 0 && (
-              <optgroup label="Other exercises for this muscle">
-                {others.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.name}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-          </select>
-          <div className={styles.subtitle} style={{ marginTop: 4 }}>
+          <div style={{ fontWeight: 700, fontSize: "1.05rem", marginTop: 2 }}>{info?.name ?? "No exercise left for this angle"}</div>
+          <div className={styles.subtitle} style={{ marginTop: 2 }}>
             3 × {row.angle.reps}
           </div>
         </div>
@@ -360,11 +379,14 @@ function SuggestionRow({ row, exId, checked, onCheck, onChange }) {
           exId && <MuscleMap {...musclesFor(exId)} size="sm" />
         )}
       </div>
-      {info && (
-        <div className={styles.row} style={{ marginTop: 6 }}>
-          <HowTo exercise={info} />
-        </div>
-      )}
+      <div className={styles.row} style={{ marginTop: 6 }}>
+        {exId && (
+          <button className={`${styles.btn} ${styles.btnSmall}`} onClick={onSwitch}>
+            ⇄ Switch
+          </button>
+        )}
+        {info && <HowTo exercise={info} />}
+      </div>
     </li>
   );
 }
