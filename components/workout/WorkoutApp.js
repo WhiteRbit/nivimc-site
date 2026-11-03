@@ -93,13 +93,22 @@ export default function WorkoutApp() {
   return (
     <div className={styles.app} id="workout-app">
       <header className={styles.header}>
-        <div>
-          <h1 className={styles.title}>{progressive ? "Progressive Overload" : "Squat Every Day"}</h1>
-          <div className={styles.subtitle}>Daily tracker · Strength Training Anatomy routines · v{process.env.NEXT_PUBLIC_APP_VERSION}</div>
-        </div>
-        <div className={styles.streak}>
-          <span className={styles.streakNum}>{streak}</span>
-          {progressive ? "workouts this week" : "day squat streak"}
+        <h1 className={styles.title}>{progressive ? "Progressive Overload" : "Squat Every Day"}</h1>
+        <div className={styles.row} style={{ gap: 6, flexWrap: "nowrap" }}>
+          <span className={styles.pill} title={progressive ? "Workouts this week" : "Day squat streak"}>
+            {progressive ? `${streak} this week` : `🔥 ${streak}`}
+          </span>
+          {wake.supported && (
+            <button
+              className={styles.iconBtn}
+              onClick={() => wake.setOn(!wake.on)}
+              aria-pressed={wake.on}
+              aria-label="Keep screen on"
+              title={wake.on ? "Screen stays on" : "Keep screen on"}
+            >
+              ☀
+            </button>
+          )}
         </div>
       </header>
 
@@ -111,25 +120,6 @@ export default function WorkoutApp() {
         >
           ↻ New version available · Update
         </button>
-      )}
-
-      {(wake.supported || installer.canInstall) && (
-        <div className={styles.row} style={{ marginBottom: 12 }}>
-          {wake.supported && (
-            <button
-              className={`${styles.btn} ${styles.btnSmall} ${wake.on ? styles.btnPrimary : ""}`}
-              onClick={() => wake.setOn(!wake.on)}
-              aria-pressed={wake.on}
-            >
-              {wake.on ? "☀ Screen stays on" : "☀ Keep screen on"}
-            </button>
-          )}
-          {installer.canInstall && (
-            <button className={`${styles.btn} ${styles.btnSmall}`} onClick={installer.install}>
-              ⬇ Install app
-            </button>
-          )}
-        </div>
       )}
 
       <nav className={styles.tabs} aria-label="Sections">
