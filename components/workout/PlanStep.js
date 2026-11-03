@@ -6,7 +6,7 @@ import HowTo from "./HowTo";
 import SwapSheet from "./SwapSheet";
 import MuscleMap from "./MuscleMap";
 import { liftPlan, liftSkipped } from "./LiftBlock";
-import { ACTIVE_EXERCISES, EXERCISE_BY_ID } from "@/lib/workout/exercises";
+import { ACTIVE_EXERCISES, EXERCISE_BY_ID, searchExercises } from "@/lib/workout/exercises";
 import { suggestFor } from "@/lib/workout/angles";
 import { REGIONS, musclesFor } from "@/lib/workout/muscles";
 import { photosFor } from "@/lib/workout/photos";
@@ -24,7 +24,8 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
   const [switching, setSwitching] = useState(null); // { exId, preferred, onPick } while the switch sheet is open
   const [builtSwap, setBuiltSwap] = useState({}); // built plan: suggested exercise id → switched-to id
   const [on, setOn] = useState({}); // row key → ticked
-  const [extra, setExtra] = useState([]); // other exercises ticked from a muscle's full list
+  const [extra, setExtra] = useState([]); // other exercises ticked from a muscle's full list or the search
+  const [query, setQuery] = useState(""); // find an exercise by name
   const units = state.settings.units;
 
   const inWorkout = day.exercises.map((e) => e.exId);
@@ -37,6 +38,10 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
   const othersFor = (region) => ACTIVE_EXERCISES.filter((e) => musclesFor(e.id).primary.includes(region) && !picked.has(e.id));
   const extraChosen = extra.filter((id) => !picked.has(id));
   const total = chosen.length + extraChosen.length;
+
+  const toggleExtra = (id, v) => setExtra((cur) => (v ? [...cur, id] : cur.filter((x) => x !== id)));
+  const found = query.trim() ? searchExercises(query).filter((e) => !picked.has(e.id)) : []; // already in the workout or suggested above: left out
+  const fromSearch = extraChosen.filter((id) => !regions.some((r) => musclesFor(id).primary.includes(r)));
 
   const toggleRegion = (r) => setRegions((cur) => (cur.includes(r) ? cur.filter((x) => x !== r) : [...cur, r]));
 
@@ -53,17 +58,41 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
       regions,
       minutes,
       taken: inWorkout,
-      lifts: LIFTS.map((l) => ({ ...l, light: liftPlan(state, day, dateKey, l).isLight, skipped: liftSkipped(state, day, l) })),
+      lifts: LIFTS.map((l) => ({
+        ...l,
+        light: liftPlan(state, day, dateKey, l).isLight,
+        skipped: liftSkipped(state, day, l),
+      })),
     });
 
-  const builtItems = built ? built.items.map((it) => ({ ...it, exId: builtSwap[it.exId] ?? it.exId, suggested: it.exId })) : [];
+  const builtItems = built
+    ? built.items.map((it) => ({
+        ...it,
+        exId: builtSwap[it.exId] ?? it.exId,
+        suggested: it.exId,
+      }))
+    : [];
 
   const useBuilt = () => {
     edit((d) => {
       if (built.skipDeadlift && !liftSkipped(state, day, LIFTS[1])) d.deadlift.skip = true;
       for (const it of builtItems) {
         if (d.exercises.some((e) => e.exId === it.exId)) continue;
-        d.exercises.push({ exId: it.exId, targetSets: it.sets, targetReps: it.reps, sets: Array.from({ length: it.sets }, newSet) });
+        d.exercises.push({
+          exId: it.exId,
+          targetSets: it.sets,
+          targetReps: it.reps,
+          sets: Array.from({ length: it.sets }, newSet),
+        });
+      }
+      for (const exId of extraChosen) {
+        if (!d.exercises.some((e) => e.exId === exId))
+          d.exercises.push({
+            exId,
+            targetSets: 3,
+            targetReps: "10-12",
+            sets: [newSet(), newSet(), newSet()],
+          });
       }
       if (!d.title) d.title = built.regions.length ? built.regions.map((r) => REGIONS[r]).join(" + ") : "Daily lifts";
       d.plannedMinutes = minutes;
@@ -72,6 +101,8 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
     setMinutes(null);
     setRegions([]);
     setBuiltSwap({});
+    setExtra([]);
+    setQuery("");
     onStart();
   };
 
@@ -80,11 +111,21 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
       for (const r of chosen) {
         const exId = pick(r);
         if (d.exercises.some((e) => e.exId === exId)) continue;
-        d.exercises.push({ exId, targetSets: 3, targetReps: r.angle.reps, sets: [newSet(), newSet(), newSet()] });
+        d.exercises.push({
+          exId,
+          targetSets: 3,
+          targetReps: r.angle.reps,
+          sets: [newSet(), newSet(), newSet()],
+        });
       }
       for (const exId of extraChosen) {
         if (!d.exercises.some((e) => e.exId === exId))
-          d.exercises.push({ exId, targetSets: 3, targetReps: "10-12", sets: [newSet(), newSet(), newSet()] });
+          d.exercises.push({
+            exId,
+            targetSets: 3,
+            targetReps: "10-12",
+            sets: [newSet(), newSet(), newSet()],
+          });
       }
       if (!d.title && regions.length) d.title = regions.map((r) => REGIONS[r]).join(" + ");
       d.stage = "workout";
@@ -93,6 +134,7 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
     setChoice({});
     setOn({});
     setExtra([]);
+    setQuery("");
     onStart();
   };
 
@@ -182,6 +224,41 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
               Or use a saved routine · today: {planned.title}
             </button>
           )
+        )}
+      </section>
+
+      {/* ---------------------------------------------------------- Search by name */}
+      <section className={styles.card}>
+        <div className={styles.label}>🔍 Find an exercise by name</div>
+        <input
+          type="search"
+          className={styles.input}
+          style={{ width: "100%", marginTop: 8 }}
+          placeholder="e.g. lunges, pull-up, plank…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          aria-label="Search exercises by name"
+        />
+        {query.trim() && (
+          <>
+            <div className={styles.subtitle} style={{ marginTop: 8 }}>
+              {found.length ? `${found.length} found · tick to add` : "No exercise with that name."}
+            </div>
+            <ul className={styles.list} style={{ marginTop: 4 }}>
+              {found.slice(0, 15).map((e) => (
+                <ExtraRow key={e.id} exercise={e} checked={extra.includes(e.id)} onCheck={(v) => toggleExtra(e.id, v)} />
+              ))}
+            </ul>
+          </>
+        )}
+        {fromSearch.length > 0 && (
+          <div className={styles.row} style={{ marginTop: 10 }}>
+            {fromSearch.map((id) => (
+              <button key={id} className={`${styles.btn} ${styles.btnSmall} ${styles.btnPrimary}`} onClick={() => toggleExtra(id, false)}>
+                {EXERCISE_BY_ID[id]?.name} ✕
+              </button>
+            ))}
+          </div>
         )}
       </section>
 
@@ -296,12 +373,7 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
               </div>
               <ul className={styles.list} style={{ marginTop: 4 }}>
                 {othersFor(region).map((e) => (
-                  <ExtraRow
-                    key={e.id}
-                    exercise={e}
-                    checked={extra.includes(e.id)}
-                    onCheck={(v) => setExtra((cur) => (v ? [...cur, e.id] : cur.filter((x) => x !== e.id)))}
-                  />
+                  <ExtraRow key={e.id} exercise={e} checked={extra.includes(e.id)} onCheck={(v) => toggleExtra(e.id, v)} />
                 ))}
               </ul>
             </>
@@ -333,7 +405,8 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
       <div className={styles.stickyCta}>
         {built ? (
           <button className={`${styles.btn} ${styles.btnPrimary} ${styles.btnBlock}`} onClick={useBuilt}>
-            Use this {minutes}-min workout →
+            Use this {minutes}-min workout
+            {extraChosen.length ? ` + ${extraChosen.length} more` : ""} →
           </button>
         ) : total > 0 ? (
           <button className={`${styles.btn} ${styles.btnPrimary} ${styles.btnBlock}`} onClick={add}>

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import styles from "./workout.module.css";
-import { ACTIVE_EXERCISES, ACTIVE_GROUPS, sourceLabel } from "@/lib/workout/exercises";
+import { ACTIVE_GROUPS, sourceLabel, searchExercises } from "@/lib/workout/exercises";
 
 // Modal list of every exercise in the book, filterable by chapter and name.
 export default function ExercisePicker({ title, initialGroup = "all", onPick, onClose }) {
@@ -10,12 +10,7 @@ export default function ExercisePicker({ title, initialGroup = "all", onPick, on
   const [query, setQuery] = useState("");
 
   const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return ACTIVE_EXERCISES.filter(
-      (e) =>
-        (group === "all" || e.group === group) &&
-        (!q || e.name.toLowerCase().includes(q) || e.muscles.toLowerCase().includes(q)),
-    );
+    return searchExercises(query).filter((e) => group === "all" || e.group === group);
   }, [group, query]);
 
   return (
