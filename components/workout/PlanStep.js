@@ -5,12 +5,12 @@ import styles from "./workout.module.css";
 import HowTo from "./HowTo";
 import SwapSheet from "./SwapSheet";
 import MuscleMap from "./MuscleMap";
-import { liftPlan, liftSkipped } from "./LiftBlock";
+import { liftPlan, liftSkipped, nextLiftDay } from "./LiftBlock";
 import { ACTIVE_EXERCISES, EXERCISE_BY_ID, searchExercises } from "@/lib/workout/exercises";
 import { suggestFor } from "@/lib/workout/angles";
 import { REGIONS, musclesFor } from "@/lib/workout/muscles";
 import { photosFor } from "@/lib/workout/photos";
-import { LIFTS } from "@/lib/workout/program";
+import { LIFTS, TRAINING_MODES, isProgressive } from "@/lib/workout/program";
 import { newSet } from "@/lib/workout/log";
 import { buildWorkout } from "@/lib/workout/builder";
 
@@ -18,7 +18,7 @@ const fmtPyramid = (sets) => sets.map((s) => `${s.weight}×${s.reps}`).join(" �
 
 // Step 1: daily lifts at the top, then pick muscles on the body and get exercises that
 // cover each one from every angle. "Add to today's workout" moves on to step 2.
-export default function PlanStep({ state, day, dateKey, edit, planned, onUseRoutine, onStart }) {
+export default function PlanStep({ state, day, dateKey, edit, setSettings, planned, onUseRoutine, onStart }) {
   const [regions, setRegions] = useState([]); // tapped muscles, in tap order
   const [choice, setChoice] = useState({}); // row key → chosen exercise id
   const [switching, setSwitching] = useState(null); // { exId, preferred, onPick } while the switch sheet is open
@@ -27,6 +27,8 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
   const [extra, setExtra] = useState([]); // other exercises ticked from a muscle's full list or the search
   const [query, setQuery] = useState(""); // find an exercise by name
   const units = state.settings.units;
+  const progressive = isProgressive(state.settings);
+  const mode = TRAINING_MODES.find((m) => m.id === (progressive ? "progressive" : "daily"));
 
   const inWorkout = day.exercises.map((e) => e.exId);
   const rows = suggestFor(regions, inWorkout);
@@ -61,7 +63,7 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
       lifts: LIFTS.map((l) => ({
         ...l,
         light: liftPlan(state, day, dateKey, l).isLight,
-        skipped: liftSkipped(state, day, l),
+        skipped: liftSkipped(state, day, l, dateKey),
       })),
     });
 
@@ -75,7 +77,7 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
 
   const useBuilt = () => {
     edit((d) => {
-      if (built.skipDeadlift && !liftSkipped(state, day, LIFTS[1])) d.deadlift.skip = true;
+      for (const key of built.dropped) d[key].skip = true;
       for (const it of builtItems) {
         if (d.exercises.some((e) => e.exId === it.exId)) continue;
         d.exercises.push({
@@ -140,29 +142,47 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
 
   return (
     <div>
-      {/* ---------------------------------------------------------- Daily lifts */}
+      {/* ---------------------------------------------------------- Main lifts */}
       <section className={`${styles.card} ${styles.squatCard}`}>
-        <div className={`${styles.row} ${styles.between}`}>
-          <div className={styles.label}>Today&apos;s pyramid lifts</div>
-          <label className={styles.toggle}>
-            <input
-              type="checkbox"
-              checked={lightNow}
-              onChange={(e) =>
-                edit((d) => {
-                  for (const l of LIFTS) {
-                    d[l.key].light = e.target.checked;
-                    d[l.key].sets = d[l.key].sets.filter((x) => x.done); // planned numbers change with the day type
-                  }
-                })
-              }
-            />
-            Light day
-          </label>
+        <div className={styles.label}>Training style</div>
+        <div className={styles.segment} role="radiogroup" aria-label="Training style">
+          {TRAINING_MODES.map((m) => (
+            <button
+              key={m.id}
+              role="radio"
+              aria-checked={mode.id === m.id}
+              className={`${styles.btn} ${styles.btnSmall} ${mode.id === m.id ? styles.btnPrimary : ""}`}
+              onClick={() => setSettings({ trainingMode: m.id })}
+            >
+              {m.short}
+            </button>
+          ))}
+        </div>
+        <p style={{ marginTop: 6 }}>{mode.blurb}</p>
+
+        <div className={`${styles.row} ${styles.between}`} style={{ marginTop: 14 }}>
+          <div className={styles.label}>{progressive ? "Today's main lifts" : "Today's pyramid lifts"}</div>
+          {!progressive && (
+            <label className={styles.toggle}>
+              <input
+                type="checkbox"
+                checked={lightNow}
+                onChange={(e) =>
+                  edit((d) => {
+                    for (const l of LIFTS) {
+                      d[l.key].light = e.target.checked;
+                      d[l.key].sets = d[l.key].sets.filter((x) => x.done); // planned numbers change with the day type
+                    }
+                  })
+                }
+              />
+              Light day
+            </label>
+          )}
         </div>
         {LIFTS.map((lift) => {
           const { isLight, target, sets } = liftPlan(state, day, dateKey, lift);
-          const skipped = liftSkipped(state, day, lift);
+          const skipped = liftSkipped(state, day, lift, dateKey);
           return (
             <div key={lift.key} className={styles.liftRow}>
               <div className={`${styles.row} ${styles.between}`}>
@@ -171,25 +191,32 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
                   {!skipped && !isLight && (
                     <span className={styles.subtitle}>
                       {" "}
-                      · top set {target.weight} {units}
+                      · {progressive ? `${sets.length} × ${sets[0].reps} at` : "top set"} {target.weight} {units}
                     </span>
                   )}
                 </div>
-                {lift.key === "deadlift" && (
+                {(progressive || lift.key === "deadlift") && (
                   <button
                     className={`${styles.btn} ${styles.btnGhost} ${styles.btnSmall}`}
-                    onClick={() => edit((d) => (d.deadlift.skip = !skipped))}
+                    onClick={() => edit((d) => (d[lift.key].skip = !skipped))}
                   >
-                    {skipped ? "+ Include" : "Skip today"}
+                    {skipped ? (progressive ? "+ Do it today" : "+ Include") : "Skip today"}
                   </button>
                 )}
               </div>
               {skipped ? (
-                <p>Skipped today.</p>
+                <p>
+                  {progressive && day[lift.key].skip == null
+                    ? `Rest day for the ${lift.name.toLowerCase()}${nextLiftDay(state, lift, dateKey) ? ` · next: ${nextLiftDay(state, lift, dateKey)}` : ""}.`
+                    : "Skipped today."}
+                </p>
               ) : (
                 <div className={styles.ramp}>
                   {sets.map((s, i) => (
-                    <span key={i} className={`${styles.rampStep} ${!isLight && i === sets.length - 1 ? styles.pillAccent : ""}`}>
+                    <span
+                      key={i}
+                      className={`${styles.rampStep} ${!isLight && (progressive || i === sets.length - 1) ? styles.pillAccent : ""}`}
+                    >
                       {s.weight}×{s.reps}
                     </span>
                   ))}
@@ -199,7 +226,9 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
           );
         })}
         <p style={{ marginTop: 8 }}>
-          Light weight for 10 reps, then add weight and drop reps every set. You&apos;ll log them in the next step.
+          {progressive
+            ? "Same weight for every set. Get every rep and the weight goes up next time. You'll log them in the next step."
+            : "Light weight for 10 reps, then add weight and drop reps every set. You'll log them in the next step."}
         </p>
       </section>
 
@@ -267,7 +296,7 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
         <div className={styles.label}>⏱ Short on time? Let the app build it</div>
         <p style={{ marginTop: 4 }}>
           {regions.length
-            ? `Fits the pyramid lifts plus ${regions.map((r) => REGIONS[r]).join(" + ")} into the time you have.`
+            ? `Fits the main lifts plus ${regions.map((r) => REGIONS[r]).join(" + ")} into the time you have.`
             : "Pick muscles above, or let it choose the ones you've trained least this week."}
         </p>
         <div className={styles.row} style={{ marginTop: 8 }}>
@@ -288,7 +317,9 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
             <ul className={styles.list}>
               {built.lifts.map((l) => (
                 <li key={l.key} className={styles.listItem}>
-                  <span style={{ fontWeight: 700 }}>{l.name} pyramid</span>
+                  <span style={{ fontWeight: 700 }}>
+                    {l.name} {progressive ? `${state.settings.overloadSets} × ${state.settings.overloadReps}` : "pyramid"}
+                  </span>
                   <span className={styles.subtitle}>~{l.minutes} min</span>
                 </li>
               ))}
@@ -414,7 +445,9 @@ export default function PlanStep({ state, day, dateKey, edit, planned, onUseRout
           </button>
         ) : (
           <button className={`${styles.btn} ${styles.btnPrimary} ${styles.btnBlock}`} onClick={add}>
-            {day.exercises.length ? "Go to today's workout →" : "Start with the pyramid lifts only →"}
+            {day.exercises.length || !LIFTS.some((l) => !liftSkipped(state, day, l, dateKey))
+              ? "Go to today's workout →"
+              : "Start with the main lifts only →"}
           </button>
         )}
       </div>
