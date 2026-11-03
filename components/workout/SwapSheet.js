@@ -2,11 +2,9 @@
 
 import { useState } from "react";
 import styles from "./workout.module.css";
-import HowTo from "./HowTo";
-import MuscleMap, { MapLegend } from "./MuscleMap";
-import { ACTIVE_EXERCISES, EXERCISE_BY_ID, searchExercises, sourceLabel } from "@/lib/workout/exercises";
+import ExRow from "./ExRow";
+import { ACTIVE_EXERCISES, EXERCISE_BY_ID, searchExercises } from "@/lib/workout/exercises";
 import { REGIONS, alternativesFor, musclesFor } from "@/lib/workout/muscles";
-import { photosFor } from "@/lib/workout/photos";
 import { LIFTS } from "@/lib/workout/program";
 
 const DAILY_LIFTS = new Set(LIFTS.map((l) => l.exId));
@@ -38,48 +36,24 @@ export default function SwapSheet({ exId, region, preferred, exclude = [], keepL
       .join(", ");
 
   const item = (e, works) => (
-    <li key={e.id} className={styles.swapItem}>
-      <div className={styles.cardHead}>
-        <div className={styles.grow}>
-          <div style={{ fontWeight: 700 }}>{e.name}</div>
-          <div className={styles.muscles}>
-            {works} · {sourceLabel(e)}
-          </div>
-          <div className={styles.row} style={{ marginTop: 8 }}>
-            <button className={`${styles.btn} ${styles.btnPrimary} ${styles.btnSmall}`} onClick={() => onPick(e.id, keep)}>
-              Use this
-            </button>
-            <HowTo exercise={e} />
-          </div>
-        </div>
-        {photosFor(e.id) ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={photosFor(e.id)[0]} alt="" className={styles.thumb} style={{ marginTop: 0 }} loading="lazy" />
-        ) : (
-          <MuscleMap {...musclesFor(e.id)} size="sm" />
-        )}
-      </div>
-    </li>
+    <ExRow key={e.id} exId={e.id} meta={works}>
+      <button className={`${styles.btn} ${styles.btnPrimary} ${styles.btnSmall}`} onClick={() => onPick(e.id, keep)}>
+        Use
+      </button>
+    </ExRow>
   );
 
   return (
     <div className={styles.backdrop} onClick={onClose} role="presentation">
       <div className={styles.modal} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Swap exercise">
-        <div className={`${styles.row} ${styles.between}`}>
-          <div className={styles.label}>Switch exercise</div>
+        <div className={styles.sectionHead}>
+          <div className={styles.grow}>
+            <div className={styles.sectionTitle}>Switch {current?.name}</div>
+            <div className={styles.exMeta}>{target.map((r) => REGIONS[r]).join(", ")}</div>
+          </div>
           <button className={`${styles.btn} ${styles.btnSmall}`} onClick={onClose}>
             Close
           </button>
-        </div>
-
-        <div className={styles.cardHead} style={{ marginTop: 8 }}>
-          <div className={styles.grow}>
-            <h3 className={styles.h3}>{current?.name}</h3>
-            <p style={{ marginTop: 4 }}>
-              Works: <strong style={{ color: "var(--text)" }}>{target.map((r) => REGIONS[r]).join(", ")}</strong>
-            </p>
-          </div>
-          <MuscleMap {...musclesFor(exId)} size="sm" />
         </div>
 
         {keepLabel && (
@@ -93,7 +67,7 @@ export default function SwapSheet({ exId, region, preferred, exclude = [], keepL
           type="search"
           className={styles.input}
           style={{ width: "100%", marginTop: 12 }}
-          placeholder="Search any exercise by name…"
+          placeholder="🔍  Search all exercises"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           aria-label="Search exercises by name"
@@ -111,7 +85,7 @@ export default function SwapSheet({ exId, region, preferred, exclude = [], keepL
         {!found && first.length > 0 && (
           <>
             <div className={styles.label} style={{ marginTop: 14 }}>
-              Same angle · {preferred.label}
+              Same angle
             </div>
             <ul className={styles.list}>{first.map((e) => item(e, worksText(e.id)))}</ul>
           </>
@@ -120,19 +94,13 @@ export default function SwapSheet({ exId, region, preferred, exclude = [], keepL
         {!found && rest.length > 0 && (
           <>
             <div className={styles.label} style={{ marginTop: 14 }}>
-              Also works {area.map((r) => REGIONS[r]).join(" / ")}
+              Also {area.map((r) => REGIONS[r]).join(" / ")}
             </div>
-            <ul className={styles.list}>
-              {rest.map(({ exercise: e, shared }) => item(e, `Works ${shared.map((r) => REGIONS[r]).join(", ")}`))}
-            </ul>
+            <ul className={styles.list}>{rest.map(({ exercise: e, shared }) => item(e, shared.map((r) => REGIONS[r]).join(", ")))}</ul>
           </>
         )}
 
         {!found && !first.length && !rest.length && <p style={{ marginTop: 12 }}>No other exercises for this area.</p>}
-
-        <div style={{ marginTop: 12 }}>
-          <MapLegend />
-        </div>
       </div>
     </div>
   );

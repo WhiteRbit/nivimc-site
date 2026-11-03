@@ -13,7 +13,8 @@
 
   max-width: 760px;
   margin: 0 auto;
-  padding: 88px 16px 150px; /* room for the rest timer and site footer */
+  /* the app hides the site header/footer; leave room for the bottom tab bar */
+  padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 150px);
   color: var(--text);
   font-family: var(--font-jakarta, ui-sans-serif), system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
@@ -28,14 +29,14 @@
 
 .header {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
 .title {
-  font-size: 1.6rem;
+  font-size: 1.15rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   margin: 0;
@@ -62,53 +63,57 @@
   line-height: 1;
 }
 
-/* Tabs */
+/* Tabs: a bottom bar, like a phone app */
 .tabs {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
   display: flex;
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--panel);
-  margin-bottom: 20px;
-  overflow-x: auto;
+  justify-content: center;
+  padding: 6px 8px calc(env(safe-area-inset-bottom) + 6px);
+  border-top: 1px solid var(--line);
+  background: rgba(10, 10, 10, 0.92);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .tab {
   flex: 1;
-  min-width: max-content;
-  padding: 10px 12px;
+  max-width: 140px;
+  min-height: 44px;
+  padding: 6px 4px;
   border: 0;
   border-radius: 10px;
   background: transparent;
   color: var(--muted);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
 }
 
 .tabActive {
-  background: var(--panel-2);
-  color: var(--text);
+  color: var(--accent);
 }
+
 
 /* Generic blocks */
 .card {
-  border: 1px solid var(--line);
-  border-radius: 16px;
+  border: 0;
+  border-radius: 14px;
   background: var(--panel);
-  padding: 16px;
-  margin-bottom: 12px;
+  padding: 14px;
+  margin-bottom: 10px;
 }
 
 .cardDone {
-  border-color: rgba(61, 220, 132, 0.4);
+  box-shadow: inset 3px 0 0 var(--ok);
 }
 
 .squatCard {
-  border-color: rgba(255, 90, 54, 0.45);
-  background: linear-gradient(180deg, var(--accent-soft), var(--panel) 60%);
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .row {
@@ -196,7 +201,7 @@
 }
 
 .btnSmall {
-  min-height: 36px;
+  min-height: 34px;
   padding: 4px 10px;
   font-size: 0.8rem;
 }
@@ -248,7 +253,7 @@
 }
 
 .sets th {
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -258,8 +263,15 @@
 }
 
 .sets td {
-  padding: 4px;
+  padding: 2px 4px;
   text-align: center;
+}
+
+.sets .input {
+  min-height: 40px;
+  padding: 6px 8px;
+  border-color: transparent;
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .sets tr.setDone td {
@@ -273,9 +285,9 @@
 }
 
 .check {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
   border: 1px solid var(--line);
   background: transparent;
   color: var(--muted);
@@ -360,10 +372,10 @@
 }
 
 .rpe {
-  min-width: 48px;
-  min-height: 44px;
-  padding: 6px;
-  border-radius: 8px;
+  min-width: 38px;
+  min-height: 38px;
+  padding: 4px;
+  border-radius: 999px;
   border: 1px solid var(--line);
   background: transparent;
   color: var(--muted);
@@ -459,7 +471,7 @@
   background: #111;
   border: 1px solid var(--line);
   border-radius: 18px 18px 0 0;
-  padding: 16px 16px 56px; /* clear the site's fixed footer */
+  padding: 16px 16px calc(env(safe-area-inset-bottom) + 24px);
   box-sizing: border-box;
 }
 
@@ -580,7 +592,7 @@
 .timer {
   position: fixed;
   left: 50%;
-  bottom: 48px;
+  bottom: calc(env(safe-area-inset-bottom) + 64px);
   transform: translateX(-50%);
   width: calc(100% - 24px);
   max-width: 560px;
@@ -714,7 +726,7 @@
 .toast {
   position: fixed;
   left: 50%;
-  bottom: 120px;
+  bottom: calc(env(safe-area-inset-bottom) + 136px);
   transform: translateX(-50%);
   width: calc(100% - 24px);
   max-width: 560px;
@@ -736,8 +748,8 @@
 .stepper {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  margin-bottom: 14px;
+  gap: 4px;
+  margin-bottom: 12px;
 }
 
 .step {
@@ -745,11 +757,12 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 44px;
-  padding: 6px;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background: var(--panel);
+  min-height: 36px;
+  padding: 4px;
+  border: 0;
+  border-bottom: 2px solid var(--line);
+  border-radius: 0;
+  background: transparent;
   color: var(--muted);
   font: inherit;
   font-size: 0.8rem;
@@ -775,7 +788,6 @@
 .stepOn {
   border-color: var(--accent);
   color: var(--text);
-  background: var(--accent-soft);
 }
 
 .stepOn .stepNum {
@@ -822,18 +834,155 @@
   margin-top: 16px;
 }
 
+/* ---------------------------------------------------------------- Clean rows */
+
+/* One line per exercise: tick · photo · name · actions */
+.exRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.exRow:last-child {
+  border-bottom: 0;
+}
+
+.exRow .bigCheck {
+  margin-top: 0;
+}
+
+.exThumb {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 10px;
+  flex-shrink: 0;
+  background: var(--panel-2);
+}
+
+.exName {
+  font-weight: 600;
+  font-size: 0.95rem;
+  line-height: 1.25;
+}
+
+.exMeta {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+/* Round icon button (switch, how-to, more) */
+.iconBtn {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 0;
+  background: var(--panel-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.iconBtn[aria-pressed="true"] {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* Text-only action, e.g. "Skip" or "Show all" */
+.linkBtn {
+  border: 0;
+  background: none;
+  padding: 6px 0;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.linkBtn:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+
+/* Row of chips that scrolls sideways instead of wrapping */
+.chipScroll {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-top: 8px;
+}
+
+.chipScroll::-webkit-scrollbar {
+  display: none;
+}
+
+.chipScroll > * {
+  flex-shrink: 0;
+}
+
+.chip {
+  min-height: 34px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chipOn {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sectionTitle {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+/* Action sheet (the "⋯" menu) */
+.sheetList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.sheetList .btn {
+  text-align: left;
+}
+
+.danger {
+  color: #ff6b6b;
+}
+
 .stickyCta {
   position: sticky;
-  bottom: 52px;
+  bottom: calc(env(safe-area-inset-bottom) + 60px); /* above the tab bar */
   z-index: 20;
   padding: 10px 0;
   background: linear-gradient(180deg, transparent, #000 35%);
-}
-
-@media (display-mode: standalone) {
-  .stickyCta {
-    bottom: calc(env(safe-area-inset-bottom) + 4px);
-  }
 }
 
 .orderBtns {

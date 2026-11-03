@@ -2,23 +2,20 @@
 
 import { useState } from "react";
 import styles from "./workout.module.css";
-import HowTo from "./HowTo";
+import ExRow from "./ExRow";
 import SwapSheet from "./SwapSheet";
 import MuscleMap from "./MuscleMap";
 import { liftPlan, liftSkipped, nextLiftDay } from "./LiftBlock";
 import { ACTIVE_EXERCISES, EXERCISE_BY_ID, searchExercises } from "@/lib/workout/exercises";
 import { suggestFor } from "@/lib/workout/angles";
 import { REGIONS, musclesFor } from "@/lib/workout/muscles";
-import { photosFor } from "@/lib/workout/photos";
-import { LIFTS, TRAINING_MODES, isProgressive } from "@/lib/workout/program";
+import { LIFTS, isProgressive } from "@/lib/workout/program";
 import { newSet } from "@/lib/workout/log";
 import { buildWorkout } from "@/lib/workout/builder";
 
-const fmtPyramid = (sets) => sets.map((s) => `${s.weight}×${s.reps}`).join(" → ");
-
 // Step 1: daily lifts at the top, then pick muscles on the body and get exercises that
 // cover each one from every angle. "Add to today's workout" moves on to step 2.
-export default function PlanStep({ state, day, dateKey, edit, setSettings, planned, onUseRoutine, onStart }) {
+export default function PlanStep({ state, day, dateKey, edit, planned, onUseRoutine, onStart }) {
   const [regions, setRegions] = useState([]); // tapped muscles, in tap order
   const [choice, setChoice] = useState({}); // row key → chosen exercise id
   const [switching, setSwitching] = useState(null); // { exId, preferred, onPick } while the switch sheet is open
@@ -28,7 +25,7 @@ export default function PlanStep({ state, day, dateKey, edit, setSettings, plann
   const [query, setQuery] = useState(""); // find an exercise by name
   const units = state.settings.units;
   const progressive = isProgressive(state.settings);
-  const mode = TRAINING_MODES.find((m) => m.id === (progressive ? "progressive" : "daily"));
+  const [showAll, setShowAll] = useState({}); // region → full exercise list open
 
   const inWorkout = day.exercises.map((e) => e.exId);
   const rows = suggestFor(regions, inWorkout);
@@ -140,28 +137,19 @@ export default function PlanStep({ state, day, dateKey, edit, setSettings, plann
     onStart();
   };
 
+  const liftSummary = (lift) => {
+    const { isLight, target, sets } = liftPlan(state, day, dateKey, lift);
+    if (isLight) return `Light · ${sets.length} × ${sets[0].reps} at ${sets[0].weight} ${units}`;
+    if (progressive) return `${sets.length} × ${sets[0].reps} at ${target.weight} ${units}`;
+    return `${sets[0].weight} → ${target.weight} ${units} · ${sets.map((x) => x.reps).join("-")}`;
+  };
+
   return (
     <div>
       {/* ---------------------------------------------------------- Main lifts */}
       <section className={`${styles.card} ${styles.squatCard}`}>
-        <div className={styles.label}>Training style</div>
-        <div className={styles.segment} role="radiogroup" aria-label="Training style">
-          {TRAINING_MODES.map((m) => (
-            <button
-              key={m.id}
-              role="radio"
-              aria-checked={mode.id === m.id}
-              className={`${styles.btn} ${styles.btnSmall} ${mode.id === m.id ? styles.btnPrimary : ""}`}
-              onClick={() => setSettings({ trainingMode: m.id })}
-            >
-              {m.short}
-            </button>
-          ))}
-        </div>
-        <p style={{ marginTop: 6 }}>{mode.blurb}</p>
-
-        <div className={`${styles.row} ${styles.between}`} style={{ marginTop: 14 }}>
-          <div className={styles.label}>{progressive ? "Today's main lifts" : "Today's pyramid lifts"}</div>
+        <div className={styles.sectionHead}>
+          <span className={styles.sectionTitle}>Main lifts</span>
           {!progressive && (
             <label className={styles.toggle}>
               <input
@@ -180,110 +168,71 @@ export default function PlanStep({ state, day, dateKey, edit, setSettings, plann
             </label>
           )}
         </div>
-        {LIFTS.map((lift) => {
-          const { isLight, target, sets } = liftPlan(state, day, dateKey, lift);
-          const skipped = liftSkipped(state, day, lift, dateKey);
-          return (
-            <div key={lift.key} className={styles.liftRow}>
-              <div className={`${styles.row} ${styles.between}`}>
-                <div style={{ fontWeight: 700 }}>
-                  {lift.name}
-                  {!skipped && !isLight && (
-                    <span className={styles.subtitle}>
-                      {" "}
-                      · {progressive ? `${sets.length} × ${sets[0].reps} at` : "top set"} {target.weight} {units}
-                    </span>
-                  )}
+        <ul className={styles.list}>
+          {LIFTS.map((lift) => {
+            const skipped = liftSkipped(state, day, lift, dateKey);
+            const next = progressive && skipped && day[lift.key].skip == null ? nextLiftDay(state, lift, dateKey) : null;
+            const canSkip = progressive || lift.key === "deadlift";
+            return (
+              <li key={lift.key} className={styles.exRow}>
+                <div className={styles.grow} style={{ opacity: skipped ? 0.5 : 1 }}>
+                  <div className={styles.exName}>{lift.name}</div>
+                  <div className={styles.exMeta}>{skipped ? (next ? `Rest day · next ${next}` : "Skipped today") : liftSummary(lift)}</div>
                 </div>
-                {(progressive || lift.key === "deadlift") && (
-                  <button
-                    className={`${styles.btn} ${styles.btnGhost} ${styles.btnSmall}`}
-                    onClick={() => edit((d) => (d[lift.key].skip = !skipped))}
-                  >
-                    {skipped ? (progressive ? "+ Do it today" : "+ Include") : "Skip today"}
+                {canSkip && (
+                  <button className={styles.linkBtn} onClick={() => edit((d) => (d[lift.key].skip = !skipped))}>
+                    {skipped ? "Add" : "Skip"}
                   </button>
                 )}
-              </div>
-              {skipped ? (
-                <p>
-                  {progressive && day[lift.key].skip == null
-                    ? `Rest day for the ${lift.name.toLowerCase()}${nextLiftDay(state, lift, dateKey) ? ` · next: ${nextLiftDay(state, lift, dateKey)}` : ""}.`
-                    : "Skipped today."}
-                </p>
-              ) : (
-                <div className={styles.ramp}>
-                  {sets.map((s, i) => (
-                    <span
-                      key={i}
-                      className={`${styles.rampStep} ${!isLight && (progressive || i === sets.length - 1) ? styles.pillAccent : ""}`}
-                    >
-                      {s.weight}×{s.reps}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-        <p style={{ marginTop: 8 }}>
-          {progressive
-            ? "Same weight for every set. Get every rep and the weight goes up next time. You'll log them in the next step."
-            : "Light weight for 10 reps, then add weight and drop reps every set. You'll log them in the next step."}
-        </p>
+              </li>
+            );
+          })}
+        </ul>
       </section>
 
-      {/* ---------------------------------------------------------- Body map */}
+      {/* ---------------------------------------------------------- Muscles + search */}
       <section className={styles.card}>
-        <div className={styles.label}>Add muscles to target today</div>
-        <p style={{ marginTop: 4 }}>Tap one or more muscles on the body.</p>
-        <div style={{ marginTop: 8 }}>
-          <MuscleMap primary={regions} size="lg" onRegion={toggleRegion} />
+        <div className={styles.sectionHead}>
+          <span className={styles.sectionTitle}>Add muscles</span>
+          {regions.length === 0 && planned?.items?.length > 0 && (
+            <button className={styles.linkBtn} onClick={onUseRoutine}>
+              Saved routine
+            </button>
+          )}
         </div>
-        {regions.length > 0 ? (
-          <div className={styles.row} style={{ marginTop: 10 }}>
+        <div style={{ marginTop: 6 }}>
+          <MuscleMap primary={regions} size="md" onRegion={toggleRegion} />
+        </div>
+        {regions.length > 0 && (
+          <div className={styles.chipScroll}>
             {regions.map((r) => (
-              <button key={r} className={`${styles.btn} ${styles.btnSmall} ${styles.btnPrimary}`} onClick={() => toggleRegion(r)}>
+              <button key={r} className={`${styles.chip} ${styles.chipOn}`} onClick={() => toggleRegion(r)}>
                 {REGIONS[r]} ✕
               </button>
             ))}
           </div>
-        ) : (
-          planned?.items?.length > 0 && (
-            <button className={`${styles.btn} ${styles.btnGhost} ${styles.btnBlock}`} style={{ marginTop: 10 }} onClick={onUseRoutine}>
-              Or use a saved routine · today: {planned.title}
-            </button>
-          )
         )}
-      </section>
-
-      {/* ---------------------------------------------------------- Search by name */}
-      <section className={styles.card}>
-        <div className={styles.label}>🔍 Find an exercise by name</div>
         <input
           type="search"
           className={styles.input}
-          style={{ width: "100%", marginTop: 8 }}
-          placeholder="e.g. lunges, pull-up, plank…"
+          style={{ width: "100%", marginTop: 10, boxSizing: "border-box" }}
+          placeholder="🔍  Search exercises"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           aria-label="Search exercises by name"
         />
         {query.trim() && (
-          <>
-            <div className={styles.subtitle} style={{ marginTop: 8 }}>
-              {found.length ? `${found.length} found · tick to add` : "No exercise with that name."}
-            </div>
-            <ul className={styles.list} style={{ marginTop: 4 }}>
-              {found.slice(0, 15).map((e) => (
-                <ExtraRow key={e.id} exercise={e} checked={extra.includes(e.id)} onCheck={(v) => toggleExtra(e.id, v)} />
-              ))}
-            </ul>
-          </>
+          <ul className={styles.list} style={{ marginTop: 4 }}>
+            {found.slice(0, 15).map((e) => (
+              <ExRow key={e.id} exId={e.id} meta={e.muscles} checked={extra.includes(e.id)} onCheck={(v) => toggleExtra(e.id, v)} />
+            ))}
+            {!found.length && <li className={styles.exMeta}>No exercise with that name.</li>}
+          </ul>
         )}
         {fromSearch.length > 0 && (
-          <div className={styles.row} style={{ marginTop: 10 }}>
+          <div className={styles.chipScroll}>
             {fromSearch.map((id) => (
-              <button key={id} className={`${styles.btn} ${styles.btnSmall} ${styles.btnPrimary}`} onClick={() => toggleExtra(id, false)}>
+              <button key={id} className={`${styles.chip} ${styles.chipOn}`} onClick={() => toggleExtra(id, false)}>
                 {EXERCISE_BY_ID[id]?.name} ✕
               </button>
             ))}
@@ -291,19 +240,64 @@ export default function PlanStep({ state, day, dateKey, edit, setSettings, plann
         )}
       </section>
 
+      {/* ---------------------------------------------------------- Suggestions */}
+      {!built &&
+        regions.map((region) => {
+          const others = othersFor(region);
+          return (
+            <section key={region} className={styles.card}>
+              <div className={styles.sectionHead}>
+                <span className={styles.sectionTitle}>{REGIONS[region]}</span>
+                {others.length > 0 && (
+                  <button className={styles.linkBtn} onClick={() => setShowAll((m) => ({ ...m, [region]: !m[region] }))}>
+                    {showAll[region] ? "Show less" : `All ${others.length + rows.filter((r) => r.region === region).length}`}
+                  </button>
+                )}
+              </div>
+              <ul className={styles.list}>
+                {rows
+                  .filter((r) => r.region === region)
+                  .map((r) => (
+                    <ExRow
+                      key={r.key}
+                      exId={pick(r)}
+                      meta={pick(r) ? `3 × ${r.angle.reps}` : "No exercise left for this angle"}
+                      checked={isOn(r)}
+                      onCheck={pick(r) ? (v) => setOn((o) => ({ ...o, [r.key]: v })) : undefined}
+                      onSwitch={
+                        pick(r)
+                          ? () =>
+                              setSwitching({
+                                exId: pick(r),
+                                region: r.region,
+                                preferred: { label: r.angle.label, ids: r.angle.options },
+                                exclude: [...inWorkout, ...rows.filter((x) => x.key !== r.key).map(pick)].filter(Boolean),
+                                onPick: (id) => {
+                                  setChoice((c) => ({ ...c, [r.key]: id }));
+                                  setOn((o) => ({ ...o, [r.key]: true }));
+                                },
+                              })
+                          : undefined
+                      }
+                    />
+                  ))}
+                {showAll[region] &&
+                  others.map((e) => (
+                    <ExRow key={e.id} exId={e.id} meta={e.muscles} checked={extra.includes(e.id)} onCheck={(v) => toggleExtra(e.id, v)} />
+                  ))}
+              </ul>
+            </section>
+          );
+        })}
+
       {/* ---------------------------------------------------------- Build for time */}
       <section className={styles.card}>
-        <div className={styles.label}>⏱ Short on time? Let the app build it</div>
-        <p style={{ marginTop: 4 }}>
-          {regions.length
-            ? `Fits the main lifts plus ${regions.map((r) => REGIONS[r]).join(" + ")} into the time you have.`
-            : "Pick muscles above, or let it choose the ones you've trained least this week."}
-        </p>
-        <div className={styles.row} style={{ marginTop: 8 }}>
+        <span className={styles.sectionTitle}>Short on time?</span>
+        <div className={styles.chipScroll}>
           {[20, 30, 45, 60, 75, 90].map((m) => (
             <button
               key={m}
-              className={`${styles.btn} ${styles.btnSmall} ${minutes === m ? styles.btnPrimary : ""}`}
+              className={`${styles.chip} ${minutes === m ? styles.chipOn : ""}`}
               onClick={() => setMinutes(minutes === m ? null : m)}
               aria-pressed={minutes === m}
             >
@@ -313,110 +307,44 @@ export default function PlanStep({ state, day, dateKey, edit, setSettings, plann
         </div>
 
         {built && (
-          <div style={{ marginTop: 12 }}>
-            <ul className={styles.list}>
+          <>
+            <ul className={styles.list} style={{ marginTop: 6 }}>
               {built.lifts.map((l) => (
-                <li key={l.key} className={styles.listItem}>
-                  <span style={{ fontWeight: 700 }}>
-                    {l.name} {progressive ? `${state.settings.overloadSets} × ${state.settings.overloadReps}` : "pyramid"}
-                  </span>
-                  <span className={styles.subtitle}>~{l.minutes} min</span>
+                <li key={l.key} className={styles.exRow}>
+                  <div className={styles.grow}>
+                    <div className={styles.exName}>{l.name}</div>
+                    <div className={styles.exMeta}>~{l.minutes} min</div>
+                  </div>
                 </li>
               ))}
               {builtItems.map((it) => (
-                <li key={it.suggested} className={styles.listItem}>
-                  <div className={styles.grow}>
-                    <div style={{ fontWeight: 700 }}>{EXERCISE_BY_ID[it.exId]?.name}</div>
-                    <div className={styles.muscles}>
-                      {REGIONS[it.region]} · {it.angle} · {it.sets} × {it.reps} · ~{it.minutes} min
-                    </div>
-                  </div>
-                  <button
-                    className={`${styles.btn} ${styles.btnSmall}`}
-                    onClick={() =>
-                      setSwitching({
-                        exId: it.exId,
-                        region: it.region,
-                        preferred: { label: it.angle, ids: it.options },
-                        exclude: builtItems.map((x) => x.exId),
-                        onPick: (id) => setBuiltSwap((m) => ({ ...m, [it.suggested]: id })),
-                      })
-                    }
-                  >
-                    ⇄ Switch
-                  </button>
-                </li>
-              ))}
-            </ul>
-            {built.notes.map((n) => (
-              <p key={n} style={{ marginTop: 6 }}>
-                {n}
-              </p>
-            ))}
-            <div style={{ fontWeight: 700, marginTop: 8 }}>
-              ~{built.total} of {minutes} min · tap the button below to use it, or pick a different time
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* ---------------------------------------------------------- Suggestions */}
-      {regions.map((region) => (
-        <section key={region} className={styles.card}>
-          <div className={`${styles.row} ${styles.between}`}>
-            <h3 className={styles.h3}>{REGIONS[region]}</h3>
-            <span className={styles.subtitle}>
-              {ACTIVE_EXERCISES.filter((e) => musclesFor(e.id).primary.includes(region)).length} exercises
-            </span>
-          </div>
-          <p style={{ marginTop: 2 }}>
-            Suggested to cover the whole muscle. Tap ⇄ Switch to swap one for another exercise for the same area, or untick it.
-          </p>
-          <ul className={styles.list} style={{ marginTop: 6 }}>
-            {rows
-              .filter((r) => r.region === region)
-              .map((r) => (
-                <SuggestionRow
-                  key={r.key}
-                  row={r}
-                  exId={pick(r)}
-                  checked={isOn(r)}
-                  onCheck={(v) => setOn((o) => ({ ...o, [r.key]: v }))}
+                <ExRow
+                  key={it.suggested}
+                  exId={it.exId}
+                  meta={`${REGIONS[it.region]} · ${it.sets} × ${it.reps} · ~${it.minutes} min`}
                   onSwitch={() =>
                     setSwitching({
-                      exId: pick(r),
-                      region: r.region,
-                      preferred: { label: r.angle.label, ids: r.angle.options },
-                      exclude: [...inWorkout, ...rows.filter((x) => x.key !== r.key).map(pick)].filter(Boolean),
-                      onPick: (id) => {
-                        setChoice((c) => ({ ...c, [r.key]: id }));
-                        setOn((o) => ({ ...o, [r.key]: true }));
-                      },
+                      exId: it.exId,
+                      region: it.region,
+                      preferred: { label: it.angle, ids: it.options },
+                      exclude: builtItems.map((x) => x.exId),
+                      onPick: (id) => setBuiltSwap((m) => ({ ...m, [it.suggested]: id })),
                     })
                   }
                 />
               ))}
-          </ul>
-          {othersFor(region).length > 0 && (
-            <>
-              <div className={styles.label} style={{ marginTop: 14 }}>
-                All other {REGIONS[region].toLowerCase()} exercises
-              </div>
-              <ul className={styles.list} style={{ marginTop: 4 }}>
-                {othersFor(region).map((e) => (
-                  <ExtraRow key={e.id} exercise={e} checked={extra.includes(e.id)} onCheck={(v) => toggleExtra(e.id, v)} />
-                ))}
-              </ul>
-            </>
-          )}
-        </section>
-      ))}
+            </ul>
+            <div className={styles.exMeta} style={{ marginTop: 6 }}>
+              ~{built.total} of {minutes} min{built.notes.length ? ` · ${built.notes.join(" ")}` : ""}
+            </div>
+          </>
+        )}
+      </section>
 
       {day.exercises.length > 0 && (
-        <section className={styles.card}>
-          <div className={styles.label}>Already in today&apos;s workout</div>
-          <p style={{ marginTop: 4, color: "var(--text)" }}>{day.exercises.map((e) => EXERCISE_BY_ID[e.exId]?.name).join(", ")}</p>
-        </section>
+        <p style={{ margin: "4px 2px 10px" }}>
+          In today&apos;s workout: {day.exercises.map((e) => EXERCISE_BY_ID[e.exId]?.name).join(", ")}
+        </p>
       )}
 
       {switching && (
@@ -436,95 +364,18 @@ export default function PlanStep({ state, day, dateKey, edit, setSettings, plann
       <div className={styles.stickyCta}>
         {built ? (
           <button className={`${styles.btn} ${styles.btnPrimary} ${styles.btnBlock}`} onClick={useBuilt}>
-            Use this {minutes}-min workout
-            {extraChosen.length ? ` + ${extraChosen.length} more` : ""} →
-          </button>
-        ) : total > 0 ? (
-          <button className={`${styles.btn} ${styles.btnPrimary} ${styles.btnBlock}`} onClick={add}>
-            Add {total} exercise{total > 1 ? "s" : ""} to today&apos;s workout →
+            Start {minutes}-min workout{extraChosen.length ? ` + ${extraChosen.length}` : ""}
           </button>
         ) : (
           <button className={`${styles.btn} ${styles.btnPrimary} ${styles.btnBlock}`} onClick={add}>
-            {day.exercises.length || !LIFTS.some((l) => !liftSkipped(state, day, l, dateKey))
-              ? "Go to today's workout →"
-              : "Start with the main lifts only →"}
+            {total > 0
+              ? `Start · ${total} exercise${total > 1 ? "s" : ""}`
+              : day.exercises.length || !LIFTS.some((l) => !liftSkipped(state, day, l, dateKey))
+                ? "Go to workout"
+                : "Start with main lifts"}
           </button>
         )}
       </div>
     </div>
-  );
-}
-
-function SuggestionRow({ row, exId, checked, onCheck, onSwitch }) {
-  const info = EXERCISE_BY_ID[exId];
-  const photo = exId ? photosFor(exId)?.[0] : null;
-
-  return (
-    <li className={styles.suggestion}>
-      <div className={styles.cardHead}>
-        <input
-          type="checkbox"
-          className={styles.bigCheck}
-          checked={checked}
-          onChange={(e) => onCheck(e.target.checked)}
-          aria-label={`Include ${info?.name}`}
-        />
-        <div className={styles.grow}>
-          <div className={styles.label} style={{ letterSpacing: "0.04em" }}>
-            {row.angle.label}
-          </div>
-          <div style={{ fontWeight: 700, fontSize: "1.05rem", marginTop: 2 }}>{info?.name ?? "No exercise left for this angle"}</div>
-          <div className={styles.subtitle} style={{ marginTop: 2 }}>
-            3 × {row.angle.reps}
-          </div>
-        </div>
-        {photo ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={photo} alt="" className={styles.thumb} loading="lazy" />
-        ) : (
-          exId && <MuscleMap {...musclesFor(exId)} size="sm" />
-        )}
-      </div>
-      <div className={styles.row} style={{ marginTop: 6 }}>
-        {exId && (
-          <button className={`${styles.btn} ${styles.btnSmall}`} onClick={onSwitch}>
-            ⇄ Switch
-          </button>
-        )}
-        {info && <HowTo exercise={info} />}
-      </div>
-    </li>
-  );
-}
-
-// A compact, untouched-by-default row for the rest of a muscle's exercises.
-function ExtraRow({ exercise, checked, onCheck }) {
-  const photo = photosFor(exercise.id)?.[0];
-  return (
-    <li className={styles.suggestion}>
-      <div className={styles.cardHead}>
-        <input
-          type="checkbox"
-          className={styles.bigCheck}
-          style={{ marginTop: 4 }}
-          checked={checked}
-          onChange={(e) => onCheck(e.target.checked)}
-          aria-label={`Include ${exercise.name}`}
-        />
-        <div className={styles.grow}>
-          <div style={{ fontWeight: 700 }}>{exercise.name}</div>
-          <div className={styles.muscles}>{exercise.muscles}</div>
-        </div>
-        {photo ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={photo} alt="" className={styles.thumb} style={{ marginTop: 0 }} loading="lazy" />
-        ) : (
-          <MuscleMap {...musclesFor(exercise.id)} size="sm" />
-        )}
-      </div>
-      <div className={styles.row} style={{ marginTop: 6 }}>
-        <HowTo exercise={exercise} />
-      </div>
-    </li>
   );
 }

@@ -4,17 +4,16 @@ import { useEffect, useState } from "react";
 import styles from "./workout.module.css";
 import SetTable, { toggleSet } from "./SetTable";
 import HowTo from "./HowTo";
+import MoreMenu from "./MoreMenu";
 import SwapSheet from "./SwapSheet";
 import WorkoutPicker from "./WorkoutPicker";
 import SessionSummary from "./SessionSummary";
 import WorkoutTime from "./WorkoutTime";
 import PlanStep from "./PlanStep";
 import LiftBlock, { liftSkipped } from "./LiftBlock";
-import MuscleMap from "./MuscleMap";
-import { EXERCISE_BY_ID, groupLabel } from "@/lib/workout/exercises";
+import { EXERCISE_BY_ID } from "@/lib/workout/exercises";
 import { DAY_NAMES, LIFTS, accessoryTarget, fromKey, isProgressive, shiftDate, weekdayOf } from "@/lib/workout/program";
 import { lastPerformance, newSet, postponeExercises, snapshotFromWeekday, viewDay, withDay } from "@/lib/workout/log";
-import { musclesFor } from "@/lib/workout/muscles";
 
 const STEPS = [
   { id: "plan", label: "Plan" },
@@ -56,35 +55,35 @@ export default function TodayView({ state, update, dateKey, setDateKey, todayKey
     window.scrollTo({ top: 0 });
   };
 
-  const dateLabel = fromKey(dateKey).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  const dateLabel = fromKey(dateKey).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
   const relative = dateKey === todayKey ? "Today" : dateKey === shiftDate(todayKey, -1) ? "Yesterday" : DAY_NAMES[weekday];
   const reached = { plan: true, workout: stage !== "plan" || day.exercises.length > 0, done: day.completed };
 
   return (
     <div>
       <div className={styles.dateBar}>
-        <button className={styles.btn} onClick={() => setDateKey(shiftDate(dateKey, -1))} aria-label="Previous day">
-          ←
+        <button className={styles.iconBtn} onClick={() => setDateKey(shiftDate(dateKey, -1))} aria-label="Previous day">
+          ‹
         </button>
         <div className={styles.dateText}>
-          <div className={styles.dateMain}>
-            {relative} · {title}
+          <div className={styles.dateMain}>{relative}</div>
+          <div className={styles.subtitle}>
+            {dateLabel}
+            {day.title ? ` · ${title}` : ""}
+            {dateKey !== todayKey && (
+              <>
+                {" · "}
+                <button className={styles.linkBtn} style={{ padding: 0 }} onClick={() => setDateKey(todayKey)}>
+                  Today
+                </button>
+              </>
+            )}
           </div>
-          <div className={styles.subtitle}>{dateLabel}</div>
         </div>
-        <button className={styles.btn} onClick={() => setDateKey(shiftDate(dateKey, 1))} aria-label="Next day">
-          →
+        <button className={styles.iconBtn} onClick={() => setDateKey(shiftDate(dateKey, 1))} aria-label="Next day">
+          ›
         </button>
       </div>
-      {dateKey !== todayKey && (
-        <button
-          className={`${styles.btn} ${styles.btnGhost} ${styles.btnBlock}`}
-          style={{ marginBottom: 12 }}
-          onClick={() => setDateKey(todayKey)}
-        >
-          Jump to today
-        </button>
-      )}
 
       <nav className={styles.stepper} aria-label="Workout steps">
         {STEPS.map((st, i) => (
@@ -95,8 +94,7 @@ export default function TodayView({ state, update, dateKey, setDateKey, todayKey
             onClick={() => goTo(st.id)}
             aria-current={stage === st.id ? "step" : undefined}
           >
-            <span className={styles.stepNum}>{i + 1}</span>
-            {st.label}
+            {i + 1} · {st.label}
           </button>
         ))}
       </nav>
@@ -107,7 +105,6 @@ export default function TodayView({ state, update, dateKey, setDateKey, todayKey
           day={day}
           dateKey={dateKey}
           edit={edit}
-          setSettings={(patch) => update((s) => ({ ...s, settings: { ...s.settings, ...patch } }))}
           planned={planDay}
           onUseRoutine={() => setChoosing(true)}
           onStart={() => window.scrollTo({ top: 0 })}
@@ -220,11 +217,11 @@ function WorkoutStep({ state, update, day, dateKey, edit, onSetDone, goTo }) {
         />
       ))}
 
-      <button className={`${styles.btn} ${styles.btnBlock}`} onClick={() => goTo("plan")}>
-        + Add more muscles / exercises
+      <button className={`${styles.btn} ${styles.btnGhost} ${styles.btnBlock}`} style={{ marginBottom: 10 }} onClick={() => goTo("plan")}>
+        + Add exercises
       </button>
 
-      <div className={styles.card} style={{ marginTop: 12 }}>
+      <div className={styles.card}>
         <WorkoutTime
           key={`${day.startedAt}-${day.finishedAt}`}
           dateKey={dateKey}
@@ -238,28 +235,20 @@ function WorkoutStep({ state, update, day, dateKey, edit, onSetDone, goTo }) {
             })
           }
         />
-      </div>
-
-      <div className={styles.card}>
-        <div className={styles.label}>Notes</div>
         <textarea
           className={styles.textarea}
-          style={{ marginTop: 6 }}
-          placeholder="Sleep, soreness, how the lifts felt…"
+          style={{ marginTop: 10 }}
+          aria-label="Notes"
+          placeholder="Notes"
           value={day.notes}
           onChange={(e) => edit((d) => (d.notes = e.target.value))}
         />
+        {unfinished.length > 0 && (
+          <button className={styles.linkBtn} style={{ marginTop: 6 }} onClick={() => postpone(unfinished)}>
+            Move unfinished to {nextLabel} →
+          </button>
+        )}
       </div>
-
-      {unfinished.length > 0 && (
-        <button
-          className={`${styles.btn} ${styles.btnGhost} ${styles.btnBlock}`}
-          style={{ marginBottom: 8 }}
-          onClick={() => postpone(unfinished)}
-        >
-          → Move unfinished exercises to {nextLabel}
-        </button>
-      )}
 
       {undo && (
         <div className={styles.toast} role="status">
@@ -278,7 +267,7 @@ function WorkoutStep({ state, update, day, dateKey, edit, onSetDone, goTo }) {
 
       <div className={styles.stickyCta}>
         <button className={`${styles.btn} ${styles.btnBlock} ${styles.btnPrimary}`} onClick={finish}>
-          Finish workout → Summary
+          Finish workout
         </button>
       </div>
 
@@ -324,43 +313,36 @@ function ExerciseCard({
 
   const writeSet = (i, fn) => edit((d) => (d.exercises[index].sets[i] = fn(d.exercises[index].sets[i])));
 
+  const lastText = last ? last.sets.map((s) => `${s.weight || "BW"}×${s.reps || "?"}`).join(", ") : null;
+  const meta = [`${ex.targetSets} × ${ex.targetReps}`, lastText && `last ${lastText}`, ex.carriedFrom && `from ${dayLabel(ex.carriedFrom)}`]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
     <section className={`${styles.card} ${allDone ? styles.cardDone : ""}`}>
-      <div className={styles.cardHead}>
-        <div className={styles.orderBtns}>
-          <button
-            className={`${styles.btn} ${styles.btnGhost} ${styles.btnSmall}`}
-            disabled={index === 0}
-            onClick={() => onMove(-1)}
-            aria-label="Move up"
-          >
-            ↑
-          </button>
-          <span className={styles.subtitle}>{index + 1}</span>
-          <button
-            className={`${styles.btn} ${styles.btnGhost} ${styles.btnSmall}`}
-            disabled={index === count - 1}
-            onClick={() => onMove(1)}
-            aria-label="Move down"
-          >
-            ↓
-          </button>
-        </div>
+      <div className={styles.sectionHead}>
         <div className={styles.grow}>
           <h3 className={styles.h3}>{info?.name ?? ex.exId}</h3>
-          <div className={styles.muscles}>{info?.muscles}</div>
-          <div className={styles.row} style={{ marginTop: 8 }}>
-            <span className={styles.pill}>{groupLabel(info?.group)}</span>
-            <span className={`${styles.pill} ${styles.pillAccent}`}>
-              {ex.targetSets} × {ex.targetReps}
-            </span>
-            {ex.carriedFrom && <span className={styles.pill}>↪ From {dayLabel(ex.carriedFrom)}</span>}
-            {ex.movedTo && <span className={styles.pill}>Rest moved to {dayLabel(ex.movedTo)}</span>}
-          </div>
-          {last && <p style={{ marginTop: 6 }}>Last time: {last.sets.map((s) => `${s.weight || "BW"}×${s.reps || "?"}`).join(", ")}</p>}
-          {next && <p style={{ marginTop: 4, color: "var(--accent)", fontWeight: 600 }}>📈 {next.text}</p>}
+          <div className={styles.exMeta}>{meta}</div>
+          {next && (
+            <div className={styles.exMeta} style={{ color: "var(--accent)" }}>
+              ↑ {next.text}
+            </div>
+          )}
         </div>
-        <MuscleMap {...musclesFor(ex.exId)} size="sm" />
+        <HowTo exercise={info} />
+        <MoreMenu
+          title={info?.name ?? "Exercise"}
+          actions={[
+            { label: "↑ Move up", onClick: () => onMove(-1), hidden: index === 0 },
+            { label: "↓ Move down", onClick: () => onMove(1), hidden: index === count - 1 },
+            { label: "⇄ Swap for another exercise", onClick: onSwap },
+            { label: "+ Add a set", onClick: () => edit((d) => d.exercises[index].sets.push(newSet())) },
+            { label: "− Remove a set", onClick: () => edit((d) => d.exercises[index].sets.pop()), hidden: ex.sets.length <= 1 },
+            { label: `→ Do the rest on ${nextLabel}`, onClick: onPostpone, hidden: allDone },
+            { label: "Remove exercise", onClick: () => edit((d) => d.exercises.splice(index, 1)), danger: true },
+          ]}
+        />
       </div>
 
       <SetTable
@@ -376,35 +358,6 @@ function ExerciseCard({
           writeSet(i, (s) => toggleSet(s, ph));
         }}
       />
-
-      <div className={styles.row} style={{ marginTop: 10 }}>
-        <HowTo exercise={info} />
-        {!allDone && (
-          <button className={`${styles.btn} ${styles.btnSmall}`} onClick={onPostpone} title={`Do the unfinished sets on ${nextLabel}`}>
-            → {nextLabel}
-          </button>
-        )}
-        <button
-          className={`${styles.btn} ${styles.btnGhost} ${styles.btnSmall}`}
-          onClick={() => edit((d) => d.exercises[index].sets.push(newSet()))}
-        >
-          + Set
-        </button>
-        {ex.sets.length > 1 && (
-          <button
-            className={`${styles.btn} ${styles.btnGhost} ${styles.btnSmall}`}
-            onClick={() => edit((d) => d.exercises[index].sets.pop())}
-          >
-            − Set
-          </button>
-        )}
-        <button className={`${styles.btn} ${styles.btnGhost} ${styles.btnSmall}`} onClick={onSwap}>
-          Swap
-        </button>
-        <button className={`${styles.btn} ${styles.btnGhost} ${styles.btnSmall}`} onClick={() => edit((d) => d.exercises.splice(index, 1))}>
-          Remove
-        </button>
-      </div>
     </section>
   );
 }

@@ -63,6 +63,25 @@ export default function SettingsView({ state, update, reset, installer }) {
   return (
     <div>
       <section className={styles.card}>
+        <div className={styles.label}>Training style</div>
+        <div className={styles.segment} role="radiogroup" aria-label="Training style">
+          {TRAINING_MODES.map((m) => (
+            <button
+              key={m.id}
+              role="radio"
+              aria-checked={(progressive ? "progressive" : "daily") === m.id}
+              className={`${styles.btn} ${styles.btnSmall} ${(progressive ? "progressive" : "daily") === m.id ? styles.btnPrimary : ""}`}
+              onClick={() => set("trainingMode", m.id)}
+            >
+              {m.short}
+            </button>
+          ))}
+        </div>
+        <p style={{ marginTop: 8 }}>{TRAINING_MODES.find((m) => m.id === (progressive ? "progressive" : "daily")).blurb}</p>
+        <p style={{ marginTop: 6 }}>You can switch any time; your history stays and the next targets adjust.</p>
+      </section>
+
+      <section className={styles.card}>
         <div className={styles.label}>Put it on your phone</div>
         {installer.installed ? (
           <p style={{ marginTop: 6 }}>Installed — you&apos;re using the home-screen app. It works offline at the gym.</p>
@@ -112,25 +131,6 @@ export default function SettingsView({ state, update, reset, installer }) {
         <p style={{ marginTop: 8 }}>
           Switching converts everything: your logged weights, squat target, bar weight (20 kg ⇄ 45 lb) and progression step (2.5 kg ⇄ 5 lb).
         </p>
-      </section>
-
-      <section className={styles.card}>
-        <div className={styles.label}>Training style</div>
-        <div className={styles.segment} role="radiogroup" aria-label="Training style">
-          {TRAINING_MODES.map((m) => (
-            <button
-              key={m.id}
-              role="radio"
-              aria-checked={(progressive ? "progressive" : "daily") === m.id}
-              className={`${styles.btn} ${styles.btnSmall} ${(progressive ? "progressive" : "daily") === m.id ? styles.btnPrimary : ""}`}
-              onClick={() => set("trainingMode", m.id)}
-            >
-              {m.short}
-            </button>
-          ))}
-        </div>
-        <p style={{ marginTop: 8 }}>{TRAINING_MODES.find((m) => m.id === (progressive ? "progressive" : "daily")).blurb}</p>
-        <p style={{ marginTop: 6 }}>You can switch any time; your history stays and the next targets adjust.</p>
       </section>
 
       <section className={styles.card}>
@@ -263,7 +263,7 @@ export default function SettingsView({ state, update, reset, installer }) {
         Exercise photos come from the Free Exercise DB (github.com/yuhonas/free-exercise-db). The daily squat follows the idea of Cory
         Gregory&apos;s &quot;Squat Every Day&quot; program: squat every day, pyramiding from light high-rep sets up to a clean heavy top set
         without grinding. The exact numbers here are this app&apos;s defaults, not the official program — tune them to you. This is a
-        tracker, not medical advice; stop if something hurts.
+        tracker, not medical advice; stop if something hurts. Version {process.env.NEXT_PUBLIC_APP_VERSION}.
       </p>
     </div>
   );
