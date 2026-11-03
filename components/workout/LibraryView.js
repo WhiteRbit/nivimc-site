@@ -5,7 +5,7 @@ import styles from "./workout.module.css";
 import HowTo from "./HowTo";
 import MuscleMap, { MapLegend } from "./MuscleMap";
 import { REGIONS, musclesFor } from "@/lib/workout/muscles";
-import { ACTIVE_EXERCISES, ACTIVE_GROUPS, sourceLabel } from "@/lib/workout/exercises";
+import { ACTIVE_EXERCISES, ACTIVE_GROUPS, sourceLabel, searchExercises } from "@/lib/workout/exercises";
 import { DAY_NAMES } from "@/lib/workout/program";
 
 const ORDER = [1, 2, 3, 4, 5, 6, 0];
@@ -18,12 +18,8 @@ export default function LibraryView({ state, update }) {
   const [muscle, setMuscle] = useState(null); // region tapped on the body map
 
   const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return ACTIVE_EXERCISES.filter(
-      (e) =>
-        (group === "all" || e.group === group) &&
-        (!q || e.name.toLowerCase().includes(q) || e.muscles.toLowerCase().includes(q)) &&
-        (!muscle || musclesFor(e.id).primary.includes(muscle)),
+    return searchExercises(query).filter(
+      (e) => (group === "all" || e.group === group) && (!muscle || musclesFor(e.id).primary.includes(muscle)),
     );
   }, [group, query, muscle]);
 
@@ -40,7 +36,8 @@ export default function LibraryView({ state, update }) {
   return (
     <div>
       <p style={{ marginBottom: 12 }}>
-        {ACTIVE_EXERCISES.length} exercises: the lifts from <em>Strength Training Anatomy</em> (with book page) plus core work, each with form cues.
+        {ACTIVE_EXERCISES.length} exercises: the lifts from <em>Strength Training Anatomy</em> (with book page) plus core work, each with
+        form cues.
       </p>
       <section className={styles.card}>
         <div className={styles.label}>Tap a muscle to find exercises for it</div>

@@ -8,7 +8,16 @@ import ProgressView from "./ProgressView";
 import LibraryView from "./LibraryView";
 import SettingsView from "./SettingsView";
 import { RestTimer, useInstallPrompt, useRestTimer, useUpdateCheck, useWakeLock } from "./PhoneTools";
-import { DEFAULT_PLAN, DEFAULT_SETTINGS, PLAN_VERSION, migratePlan, squatStreak, toKey } from "@/lib/workout/program";
+import {
+  DEFAULT_PLAN,
+  DEFAULT_SETTINGS,
+  PLAN_VERSION,
+  isProgressive,
+  migratePlan,
+  squatStreak,
+  toKey,
+  workoutsThisWeek,
+} from "@/lib/workout/program";
 
 const STORAGE_KEY = "nivimc-workout-v1";
 
@@ -73,7 +82,9 @@ export default function WorkoutApp() {
   const update = useCallback((fn) => setState((s) => fn(s)), []);
   const onSetDone = (seconds) => startRest(seconds ?? state.settings.restSeconds);
 
-  const streak = squatStreak(state.logs, todayKey);
+  const progressive = isProgressive(state.settings);
+  // Squat every day counts the streak; progressive overload counts sessions this week.
+  const streak = progressive ? workoutsThisWeek(state.logs, todayKey) : squatStreak(state.logs, todayKey);
   const openDay = (key) => {
     setDateKey(key);
     setTab("today");
@@ -83,14 +94,12 @@ export default function WorkoutApp() {
     <div className={styles.app} id="workout-app">
       <header className={styles.header}>
         <div>
-          <h1 className={styles.title}>Squat Every Day</h1>
-          <div className={styles.subtitle}>
-            Daily tracker · Strength Training Anatomy routines · v{process.env.NEXT_PUBLIC_APP_VERSION}
-          </div>
+          <h1 className={styles.title}>{progressive ? "Progressive Overload" : "Squat Every Day"}</h1>
+          <div className={styles.subtitle}>Daily tracker · Strength Training Anatomy routines · v{process.env.NEXT_PUBLIC_APP_VERSION}</div>
         </div>
         <div className={styles.streak}>
           <span className={styles.streakNum}>{streak}</span>
-          day squat streak
+          {progressive ? "workouts this week" : "day squat streak"}
         </div>
       </header>
 

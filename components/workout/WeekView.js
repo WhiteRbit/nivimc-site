@@ -6,7 +6,7 @@ import ExercisePicker from "./ExercisePicker";
 import SwapSheet from "./SwapSheet";
 import { REGIONS, musclesFor } from "@/lib/workout/muscles";
 import { EXERCISE_BY_ID, sourceLabel } from "@/lib/workout/exercises";
-import { DAY_NAMES, DEFAULT_PLAN, pyramidReps, shiftDate, weekdayOf } from "@/lib/workout/program";
+import { DAY_NAMES, DEFAULT_PLAN, LIFTS, isProgressive, liftDays, pyramidReps, shiftDate, weekdayOf } from "@/lib/workout/program";
 
 const ORDER = [1, 2, 3, 4, 5, 6, 0]; // Monday first
 
@@ -69,16 +69,33 @@ export default function WeekView({ state, update, todayKey, openDay }) {
             />
 
             <ul className={styles.list} style={{ marginTop: 6 }}>
-              <li className={styles.listItem}>
-                <div className={styles.grow}>
-                  <div style={{ fontWeight: 600 }}>Back Squat</div>
-                  <div className={styles.muscles}>{light ? "Light / recovery sets" : `Pyramid ${pyramidReps(settings).join("-")} reps, light → heavy`}</div>
-                </div>
-                <label className={styles.toggle}>
-                  <input type="checkbox" checked={light} onChange={() => toggleLight(wd)} />
-                  Light
-                </label>
-              </li>
+              {isProgressive(settings) ? (
+                <li className={styles.listItem}>
+                  <div className={styles.grow}>
+                    <div style={{ fontWeight: 600 }}>
+                      {LIFTS.filter((l) => liftDays(settings, l.key).includes(wd))
+                        .map((l) => l.name)
+                        .join(" + ") || "No main lift"}
+                    </div>
+                    <div className={styles.muscles}>
+                      Progressive overload · {settings.overloadSets} × {settings.overloadReps} · days are set in Settings
+                    </div>
+                  </div>
+                </li>
+              ) : (
+                <li className={styles.listItem}>
+                  <div className={styles.grow}>
+                    <div style={{ fontWeight: 600 }}>Back Squat</div>
+                    <div className={styles.muscles}>
+                      {light ? "Light / recovery sets" : `Pyramid ${pyramidReps(settings).join("-")} reps, light → heavy`}
+                    </div>
+                  </div>
+                  <label className={styles.toggle}>
+                    <input type="checkbox" checked={light} onChange={() => toggleLight(wd)} />
+                    Light
+                  </label>
+                </li>
+              )}
               {day.items.map((it, i) => (
                 <li key={`${it.exId}-${i}`} className={`${styles.listItem} ${styles.planItem}`}>
                   <div className={styles.planName}>

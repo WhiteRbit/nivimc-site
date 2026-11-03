@@ -6,7 +6,7 @@ import MuscleMap, { HeatLegend } from "./MuscleMap";
 import WorkoutTime, { fmtDuration } from "./WorkoutTime";
 import { EXERCISE_BY_ID } from "@/lib/workout/exercises";
 import { heatLevel, weeklyVolume } from "@/lib/workout/muscles";
-import { LIFTS, estimateCalories, fromKey, lastTopSet, squatTop } from "@/lib/workout/program";
+import { LIFTS, estimateCalories, fromKey, isProgressive, lastTopSet, squatTop } from "@/lib/workout/program";
 
 const num = (v) => {
   const n = Number(String(v ?? "").match(/\d+(\.\d+)?/)?.[0]);
@@ -32,10 +32,11 @@ export function summarize(state, dateKey, day) {
       sets: done(log.sets),
       top,
       light: log.light,
+      progressive: log.mode === "progressive",
       change: top && before ? top.weight - before.weight : null,
       pr: top && top.weight > bestBefore && bestBefore > 0,
     };
-  }).filter((p) => p.key === "squat" || p.sets.length);
+  }).filter((p) => p.sets.length || (p.key === "squat" && !isProgressive(state.settings)));
   const lifts = day.exercises
     .map((e) => ({ exId: e.exId, name: EXERCISE_BY_ID[e.exId]?.name ?? e.exId, sets: done(e.sets) }))
     .filter((e) => e.sets.length);
@@ -153,7 +154,7 @@ export default function SessionSummary({ state, dateKey, day, title, onEditTime,
                 <p style={{ marginTop: 6, color: "var(--text)" }}>{p.sets.map(fmtSet).join(" → ")}</p>
                 {p.top && !p.light && (
                   <p style={{ marginTop: 4 }}>
-                    Top set {p.top.weight} {units} × {p.top.reps}
+                    {p.progressive ? "Working weight" : "Top set"} {p.top.weight} {units} × {p.top.reps}
                     {p.top.rpe ? ` at RPE ${p.top.rpe}` : ""}
                     {p.change != null &&
                       (p.change > 0

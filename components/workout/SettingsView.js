@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import styles from "./workout.module.css";
 import { isIOS } from "./PhoneTools";
-import { PLAN_VERSION, convertUnits, migratePlan } from "@/lib/workout/program";
+import { DAY_NAMES, LIFTS, PLAN_VERSION, TRAINING_MODES, convertUnits, isProgressive, migratePlan } from "@/lib/workout/program";
 
 const NUMBER_FIELDS = [
   { key: "bodyWeight", label: "Your body weight (for calorie estimates)", unit: true },
@@ -11,10 +11,12 @@ const NUMBER_FIELDS = [
   { key: "deadliftStartingTop", label: "Deadlift starting top-set weight", unit: true },
   { key: "barWeight", label: "Empty bar weight", unit: true },
   { key: "increment", label: "Progression step (and plate rounding)", unit: true },
-  { key: "startPct", label: "First pyramid set (% of top set)", suffix: "%" },
-  { key: "lightPct", label: "Light day weight (% of last top set)", suffix: "%" },
-  { key: "lightSets", label: "Light day sets" },
-  { key: "lightReps", label: "Light day reps" },
+  { key: "startPct", label: "First pyramid set (% of top set)", suffix: "%", daily: true },
+  { key: "lightPct", label: "Light day weight (% of last top set)", suffix: "%", daily: true },
+  { key: "lightSets", label: "Light day sets", daily: true },
+  { key: "lightReps", label: "Light day reps", daily: true },
+  { key: "overloadSets", label: "Working sets", progressive: true },
+  { key: "overloadReps", label: "Reps per set", progressive: true },
   { key: "restSeconds", label: "Rest timer after a set (0 = off)", suffix: "s" },
   { key: "squatRestSeconds", label: "Rest timer after a squat set", suffix: "s" },
 ];
@@ -25,6 +27,12 @@ export default function SettingsView({ state, update, reset, installer }) {
   const [msg, setMsg] = useState("");
 
   const set = (key, value) => update((s) => ({ ...s, settings: { ...s.settings, [key]: value } }));
+  const progressive = isProgressive(settings);
+  const dayKey = (lift) => (lift === "deadlift" ? "deadliftDays" : "squatDays");
+  const toggleDay = (lift, wd) => {
+    const cur = settings[dayKey(lift)] ?? [];
+    set(dayKey(lift), cur.includes(wd) ? cur.filter((d) => d !== wd) : [...cur, wd].sort());
+  };
 
   const exportData = () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
@@ -107,27 +115,76 @@ export default function SettingsView({ state, update, reset, installer }) {
       </section>
 
       <section className={styles.card}>
-        <div className={styles.label}>Daily pyramid lifts</div>
+        <div className={styles.label}>Training style</div>
+        <div className={styles.segment} role="radiogroup" aria-label="Training style">
+          {TRAINING_MODES.map((m) => (
+            <button
+              key={m.id}
+              role="radio"
+              aria-checked={(progressive ? "progressive" : "daily") === m.id}
+              className={`${styles.btn} ${styles.btnSmall} ${(progressive ? "progressive" : "daily") === m.id ? styles.btnPrimary : ""}`}
+              onClick={() => set("trainingMode", m.id)}
+            >
+              {m.short}
+            </button>
+          ))}
+        </div>
+        <p style={{ marginTop: 8 }}>{TRAINING_MODES.find((m) => m.id === (progressive ? "progressive" : "daily")).blurb}</p>
+        <p style={{ marginTop: 6 }}>You can switch any time; your history stays and the next targets adjust.</p>
+      </section>
+
+      <section className={styles.card}>
+        <div className={styles.label}>{progressive ? "Main lifts · progressive overload" : "Daily pyramid lifts"}</div>
         <ul className={styles.list} style={{ marginTop: 4 }}>
-          <li className={styles.listItem}>
-            <span className={styles.grow} style={{ fontSize: "0.9rem" }}>
-              Pyramid reps per set
-            </span>
-            <input
-              className={styles.input}
-              style={{ width: 130, textAlign: "center" }}
-              value={settings.pyramidReps}
-              onChange={(e) => set("pyramidReps", e.target.value)}
-              aria-label="Pyramid reps per set"
-            />
-          </li>
-          <li className={styles.listItem}>
-            <label className={`${styles.toggle} ${styles.grow}`} style={{ fontSize: "0.9rem", color: "var(--text)" }}>
-              <input type="checkbox" checked={settings.dailyDeadlift !== false} onChange={(e) => set("dailyDeadlift", e.target.checked)} />
-              Include the deadlift pyramid every day
-            </label>
-          </li>
-          {NUMBER_FIELDS.map((f) => (
+          {progressive &&
+            LIFTS.map((l) => (
+              <li key={l.key} className={styles.listItem} style={{ flexWrap: "wrap" }}>
+                <span className={styles.grow} style={{ fontSize: "0.9rem" }}>
+                  {l.name} days
+                </span>
+                <div className={styles.row} style={{ gap: 4 }} role="group" aria-label={`${l.name} days`}>
+                  {[1, 2, 3, 4, 5, 6, 0].map((wd) => (
+                    <button
+                      key={wd}
+                      className={`${styles.btn} ${styles.btnSmall} ${(settings[dayKey(l.key)] ?? []).includes(wd) ? styles.btnPrimary : ""}`}
+                      style={{ padding: "6px 8px", minWidth: 0 }}
+                      aria-pressed={(settings[dayKey(l.key)] ?? []).includes(wd)}
+                      aria-label={DAY_NAMES[wd]}
+                      onClick={() => toggleDay(l.key, wd)}
+                    >
+                      {DAY_NAMES[wd].slice(0, 2)}
+                    </button>
+                  ))}
+                </div>
+              </li>
+            ))}
+          {!progressive && (
+            <>
+              <li className={styles.listItem}>
+                <span className={styles.grow} style={{ fontSize: "0.9rem" }}>
+                  Pyramid reps per set
+                </span>
+                <input
+                  className={styles.input}
+                  style={{ width: 130, textAlign: "center" }}
+                  value={settings.pyramidReps}
+                  onChange={(e) => set("pyramidReps", e.target.value)}
+                  aria-label="Pyramid reps per set"
+                />
+              </li>
+              <li className={styles.listItem}>
+                <label className={`${styles.toggle} ${styles.grow}`} style={{ fontSize: "0.9rem", color: "var(--text)" }}>
+                  <input
+                    type="checkbox"
+                    checked={settings.dailyDeadlift !== false}
+                    onChange={(e) => set("dailyDeadlift", e.target.checked)}
+                  />
+                  Include the deadlift pyramid every day
+                </label>
+              </li>
+            </>
+          )}
+          {NUMBER_FIELDS.filter((f) => (progressive ? !f.daily : !f.progressive)).map((f) => (
             <li key={f.key} className={styles.listItem}>
               <span className={styles.grow} style={{ fontSize: "0.9rem" }}>
                 {f.label}
@@ -148,11 +205,19 @@ export default function SettingsView({ state, update, reset, installer }) {
             </li>
           ))}
         </ul>
-        <p style={{ marginTop: 8 }}>
-          The squat is a pyramid: the first set is light for the most reps, then every set adds weight and drops reps up to the top set.
-          Rate the top set after you finish: RPE 8 or easier → next heavy day adds one step. RPE 9 → repeat the weight. RPE 10 → drop about
-          10% and rebuild.
-        </p>
+        {progressive ? (
+          <p style={{ marginTop: 8 }}>
+            Every set uses the same weight. Get all {settings.overloadSets} × {settings.overloadReps} and the next session adds one step
+            (two for the deadlift). Miss reps and you repeat the weight; miss it 3 sessions in a row and it drops about 10%. Other exercises
+            show a 📈 next step too: add reps until every set hits the top of its range, then add weight.
+          </p>
+        ) : (
+          <p style={{ marginTop: 8 }}>
+            The squat is a pyramid: the first set is light for the most reps, then every set adds weight and drops reps up to the top set.
+            Rate the top set after you finish: RPE 8 or easier → next heavy day adds one step. RPE 9 → repeat the weight. RPE 10 → drop
+            about 10% and rebuild.
+          </p>
+        )}
       </section>
 
       <section className={styles.card}>

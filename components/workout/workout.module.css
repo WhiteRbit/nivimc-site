@@ -848,3 +848,14 @@
   min-height: 32px;
   padding: 2px 8px;
 }
+
+/* Two-way choice, e.g. training style */
+.segment {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.segment > * {
+  flex: 1;
+}

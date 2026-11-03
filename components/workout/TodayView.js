@@ -12,7 +12,7 @@ import PlanStep from "./PlanStep";
 import LiftBlock, { liftSkipped } from "./LiftBlock";
 import MuscleMap from "./MuscleMap";
 import { EXERCISE_BY_ID, groupLabel } from "@/lib/workout/exercises";
-import { DAY_NAMES, LIFTS, fromKey, shiftDate, weekdayOf } from "@/lib/workout/program";
+import { DAY_NAMES, LIFTS, accessoryTarget, fromKey, isProgressive, shiftDate, weekdayOf } from "@/lib/workout/program";
 import { lastPerformance, newSet, postponeExercises, snapshotFromWeekday, viewDay, withDay } from "@/lib/workout/log";
 import { musclesFor } from "@/lib/workout/muscles";
 
@@ -107,6 +107,7 @@ export default function TodayView({ state, update, dateKey, setDateKey, todayKey
           day={day}
           dateKey={dateKey}
           edit={edit}
+          setSettings={(patch) => update((s) => ({ ...s, settings: { ...s.settings, ...patch } }))}
           planned={planDay}
           onUseRoutine={() => setChoosing(true)}
           onStart={() => window.scrollTo({ top: 0 })}
@@ -195,7 +196,7 @@ function WorkoutStep({ state, update, day, dateKey, edit, onSetDone, goTo }) {
 
   return (
     <div>
-      {LIFTS.filter((l) => !liftSkipped(state, day, l)).map((lift) => (
+      {LIFTS.filter((l) => !liftSkipped(state, day, l, dateKey)).map((lift) => (
         <LiftBlock key={lift.key} state={state} day={day} dateKey={dateKey} lift={lift} edit={edit} onSetDone={onSetDone} />
       ))}
 
@@ -207,6 +208,8 @@ function WorkoutStep({ state, update, day, dateKey, edit, onSetDone, goTo }) {
           count={day.exercises.length}
           units={units}
           last={lastPerformance(state.logs, ex.exId, dateKey)}
+          progressive={isProgressive(state.settings)}
+          settings={state.settings}
           edit={edit}
           onMove={(by) => move(index, by)}
           onSwap={() => setSwapIndex(index)}
@@ -298,9 +301,26 @@ function WorkoutStep({ state, update, day, dateKey, edit, onSetDone, goTo }) {
   );
 }
 
-function ExerciseCard({ ex, index, count, units, last, edit, onMove, onSwap, onSetDone, onPostpone, nextLabel, dayLabel }) {
+function ExerciseCard({
+  ex,
+  index,
+  count,
+  units,
+  last,
+  progressive,
+  settings,
+  edit,
+  onMove,
+  onSwap,
+  onSetDone,
+  onPostpone,
+  nextLabel,
+  dayLabel,
+}) {
   const info = EXERCISE_BY_ID[ex.exId];
   const allDone = ex.sets.length > 0 && ex.sets.every((s) => s.done);
+  // Progressive overload: next step from last time (more weight once every set hits the top reps).
+  const next = progressive ? accessoryTarget(last, ex.targetReps, settings) : null;
 
   const writeSet = (i, fn) => edit((d) => (d.exercises[index].sets[i] = fn(d.exercises[index].sets[i])));
 
@@ -338,6 +358,7 @@ function ExerciseCard({ ex, index, count, units, last, edit, onMove, onSwap, onS
             {ex.movedTo && <span className={styles.pill}>Rest moved to {dayLabel(ex.movedTo)}</span>}
           </div>
           {last && <p style={{ marginTop: 6 }}>Last time: {last.sets.map((s) => `${s.weight || "BW"}×${s.reps || "?"}`).join(", ")}</p>}
+          {next && <p style={{ marginTop: 4, color: "var(--accent)", fontWeight: 600 }}>📈 {next.text}</p>}
         </div>
         <MuscleMap {...musclesFor(ex.exId)} size="sm" />
       </div>
@@ -346,7 +367,7 @@ function ExerciseCard({ ex, index, count, units, last, edit, onMove, onSwap, onS
         sets={ex.sets}
         units={units}
         placeholder={(i) => ({
-          weight: last?.sets[i]?.weight || last?.sets[last.sets.length - 1]?.weight || null,
+          weight: next?.weight || last?.sets[i]?.weight || last?.sets[last.sets.length - 1]?.weight || null,
           reps: ex.targetReps,
         })}
         onChange={(i, field, value) => writeSet(i, (s) => ({ ...s, [field]: value }))}

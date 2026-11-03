@@ -4,7 +4,7 @@ import { useState } from "react";
 import styles from "./workout.module.css";
 import HowTo from "./HowTo";
 import MuscleMap, { MapLegend } from "./MuscleMap";
-import { ACTIVE_EXERCISES, EXERCISE_BY_ID, sourceLabel } from "@/lib/workout/exercises";
+import { ACTIVE_EXERCISES, EXERCISE_BY_ID, searchExercises, sourceLabel } from "@/lib/workout/exercises";
 import { REGIONS, alternativesFor, musclesFor } from "@/lib/workout/muscles";
 import { photosFor } from "@/lib/workout/photos";
 import { LIFTS } from "@/lib/workout/program";
@@ -17,6 +17,7 @@ const DAILY_LIFTS = new Set(LIFTS.map((l) => l.exId));
 // checkbox (checked by default).
 export default function SwapSheet({ exId, region, preferred, exclude = [], keepLabel, onPick, onClose }) {
   const [keep, setKeep] = useState(true);
+  const [query, setQuery] = useState(""); // search every exercise by name
   const current = EXERCISE_BY_ID[exId];
   const target = musclesFor(exId).primary;
   const hidden = new Set([exId, ...exclude, ...DAILY_LIFTS]);
@@ -28,6 +29,13 @@ export default function SwapSheet({ exId, region, preferred, exclude = [], keepL
   const rest = alternativesFor(exId, ACTIVE_EXERCISES).filter(
     (a) => !hidden.has(a.exercise.id) && !firstIds.has(a.exercise.id) && (!region || musclesFor(a.exercise.id).primary.includes(region)),
   );
+
+  // Typing a name searches the whole library, not just this muscle.
+  const found = query.trim() ? searchExercises(query).filter((e) => !hidden.has(e.id)) : null;
+  const worksText = (id) =>
+    musclesFor(id)
+      .primary.map((r) => REGIONS[r])
+      .join(", ");
 
   const item = (e, works) => (
     <li key={e.id} className={styles.swapItem}>
@@ -81,25 +89,35 @@ export default function SwapSheet({ exId, region, preferred, exclude = [], keepL
           </label>
         )}
 
-        {first.length > 0 && (
+        <input
+          type="search"
+          className={styles.input}
+          style={{ width: "100%", marginTop: 12 }}
+          placeholder="Search any exercise by name…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          aria-label="Search exercises by name"
+        />
+
+        {found && (
+          <>
+            <div className={styles.label} style={{ marginTop: 14 }}>
+              {found.length ? `${found.length} found for “${query.trim()}”` : `Nothing found for “${query.trim()}”`}
+            </div>
+            <ul className={styles.list}>{found.slice(0, 20).map((e) => item(e, worksText(e.id)))}</ul>
+          </>
+        )}
+
+        {!found && first.length > 0 && (
           <>
             <div className={styles.label} style={{ marginTop: 14 }}>
               Same angle · {preferred.label}
             </div>
-            <ul className={styles.list}>
-              {first.map((e) =>
-                item(
-                  e,
-                  musclesFor(e.id)
-                    .primary.map((r) => REGIONS[r])
-                    .join(", "),
-                ),
-              )}
-            </ul>
+            <ul className={styles.list}>{first.map((e) => item(e, worksText(e.id)))}</ul>
           </>
         )}
 
-        {rest.length > 0 && (
+        {!found && rest.length > 0 && (
           <>
             <div className={styles.label} style={{ marginTop: 14 }}>
               Also works {area.map((r) => REGIONS[r]).join(" / ")}
@@ -110,7 +128,7 @@ export default function SwapSheet({ exId, region, preferred, exclude = [], keepL
           </>
         )}
 
-        {!first.length && !rest.length && <p style={{ marginTop: 12 }}>No other exercises for this area.</p>}
+        {!found && !first.length && !rest.length && <p style={{ marginTop: 12 }}>No other exercises for this area.</p>}
 
         <div style={{ marginTop: 12 }}>
           <MapLegend />
