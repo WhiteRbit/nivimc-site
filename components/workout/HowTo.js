@@ -40,7 +40,7 @@ export default function HowTo({ exercise, text }) {
               </ol>
               {exercise.tip && <div className={styles.tip}>{exercise.tip}</div>}
               <div className={styles.exMeta} style={{ marginTop: 10 }}>
-                {exercise.page ? `Strength Training Anatomy · p. ${exercise.page}` : "Core exercise · not in the book"}
+                {exercise.page ? `Strength Training Anatomy · p. ${exercise.page}` : exercise.group === "core" ? "Core exercise · not in the book" : "Not in the book"}
               </div>
             </div>
           </div>
