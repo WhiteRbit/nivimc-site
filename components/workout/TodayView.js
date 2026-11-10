@@ -220,6 +220,7 @@ function WorkoutStep({ state, update, day, dateKey, edit, onSetDone, goTo }) {
           onPostpone={() => postpone([index])}
           nextLabel={nextLabel}
           dayLabel={(k) => DAY_NAMES[weekdayOf(k)]}
+          nextName={EXERCISE_BY_ID[day.exercises[index + 1]?.exId]?.name}
           onSetDone={onSetDone}
         />
       ))}
@@ -309,6 +310,7 @@ function ExerciseCard({
   onMove,
   onSwap,
   onSetDone,
+  nextName,
   onPostpone,
   nextLabel,
   dayLabel,
@@ -368,7 +370,12 @@ function ExerciseCard({
         })}
         onChange={(i, field, value) => writeSet(i, (s) => ({ ...s, [field]: value }))}
         onToggle={(i, ph) => {
-          if (!ex.sets[i].done) onSetDone?.();
+          if (!ex.sets[i].done) {
+            // What the rest timer shows as next: this exercise's next open set, else the next exercise.
+            const open = ex.sets.findIndex((s, k) => k !== i && !s.done);
+            const name = info?.name ?? "this exercise";
+            onSetDone?.(undefined, open >= 0 ? `${name} · set ${open + 1} of ${ex.sets.length}` : (nextName ?? "finish your workout"));
+          }
           writeSet(i, (s) => toggleSet(s, ph));
         }}
       />

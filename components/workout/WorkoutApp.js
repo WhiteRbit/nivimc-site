@@ -148,7 +148,7 @@ export default function WorkoutApp() {
   }, []);
 
   const update = useCallback((fn) => setState((s) => fn(s)), []);
-  const onSetDone = (seconds) => startRest(seconds ?? state.settings.restSeconds);
+  const onSetDone = (seconds, next) => startRest(seconds ?? state.settings.restSeconds, next);
 
   const bikini = isBikini(state.settings);
   const perWeek = bikini || isProgressive(state.settings);

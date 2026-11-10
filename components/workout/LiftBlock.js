@@ -98,7 +98,14 @@ export default function LiftBlock({ state, day, dateKey, lift, edit, onSetDone }
         labelFor={(i) => (!isLight && !progressive && i === lastIndex ? "Top" : i + 1)}
         onChange={(i, field, value) => writeSet(i, (s) => ({ ...s, [field]: value }))}
         onToggle={(i, ph) => {
-          if (!sets[i].done) onSetDone?.(state.settings.squatRestSeconds);
+          if (!sets[i].done) {
+            const open = sets.findIndex((s, k) => k !== i && !s.done);
+            const p = plan[open] ?? plan[lastIndex];
+            onSetDone?.(
+              state.settings.squatRestSeconds,
+              open >= 0 ? `${lift.name} · ${p.weight} ${units} × ${p.reps}` : `${lift.name} done · next exercise`,
+            );
+          }
           writeSet(i, (s) => toggleSet(s, ph));
         }}
       />
