@@ -41,7 +41,8 @@ export function useRestTimer() {
     } catch {
       audioRef.current = null;
     }
-    setRest((r) => ({ endsAt: Date.now() + total * 1000, total, next, big: r?.big ?? false }));
+    // A new rest opens full screen; if one is already running, keep the size the person chose.
+    setRest((r) => ({ endsAt: Date.now() + total * 1000, total, next, big: r?.big ?? true }));
   };
 
   return [rest, startRest, setRest, audioRef];
@@ -51,7 +52,7 @@ const RING_R = 44;
 const RING_C = 2 * Math.PI * RING_R;
 
 // Rest countdown: a ring that drains smoothly, shifts rose → amber (last 10 s) → green,
-// ticks at 3-2-1 and chimes at zero. Tap the ring to switch to a full-screen view.
+// ticks at 3-2-1 and chimes at zero. Opens full screen; tap the ring to shrink it, tap again to enlarge.
 export function RestTimer({ rest, setRest, audioRef }) {
   const [now, setNow] = useState(() => Date.now());
 
