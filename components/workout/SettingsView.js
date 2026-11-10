@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import styles from "./workout.module.css";
 import { isIOS } from "./PhoneTools";
+import { IS_ARTIFACT } from "@/lib/workout/env";
 import { DAY_NAMES, LIFTS, PLAN_VERSION, TRAINING_MODES, convertUnits, isProgressive, migratePlan } from "@/lib/workout/program";
 
 const NUMBER_FIELDS = [
@@ -34,12 +35,25 @@ export default function SettingsView({ state, update, reset, installer }) {
     set(dayKey(lift), cur.includes(wd) ? cur.filter((d) => d !== wd) : [...cur, wd].sort());
   };
 
-  const exportData = () => {
+  const exportData = async () => {
+    const filename = `sculpt-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    if (IS_ARTIFACT) {
+      // Inside Claude the page can't download by itself: the viewer confirms the save.
+      const downloads = await window.claude?.use?.("downloads");
+      if (!downloads) return setMsg("Saving files isn't available here. Your log is already saved to your Claude account.");
+      try {
+        await downloads.save({ filename, data: JSON.stringify(state, null, 2) });
+        setMsg("Backup saved.");
+      } catch (e) {
+        if (e?.code !== "declined") setMsg("The backup couldn't be saved. Try again in a moment.");
+      }
+      return;
+    }
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `workout-log-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -117,39 +131,41 @@ export default function SettingsView({ state, update, reset, installer }) {
         </label>
       </section>
 
-      <section className={styles.card}>
-        <div className={styles.label}>Put it on your phone</div>
-        {installer.installed ? (
-          <p style={{ marginTop: 6 }}>Installed — you&apos;re using the home-screen app. It works offline at the gym.</p>
-        ) : installer.canInstall ? (
-          <>
-            <p style={{ marginTop: 6 }}>Add it to your home screen: full screen, its own icon, and it works offline.</p>
-            <button className={`${styles.btn} ${styles.btnPrimary}`} style={{ marginTop: 10 }} onClick={installer.install}>
-              Install app
-            </button>
-          </>
-        ) : isIOS() ? (
-          <ol className={styles.steps}>
-            <li>Open this page in Safari.</li>
-            <li>
-              Tap the <strong>Share</strong> button (square with an arrow).
-            </li>
-            <li>
-              Choose <strong>Add to Home Screen</strong>, then <strong>Add</strong>.
-            </li>
-          </ol>
-        ) : (
-          <ol className={styles.steps}>
-            <li>Open this page in Chrome.</li>
-            <li>
-              Tap the <strong>⋮</strong> menu.
-            </li>
-            <li>
-              Choose <strong>Add to Home screen</strong> or <strong>Install app</strong>.
-            </li>
-          </ol>
-        )}
-      </section>
+      {!IS_ARTIFACT && (
+        <section className={styles.card}>
+          <div className={styles.label}>Put it on your phone</div>
+          {installer.installed ? (
+            <p style={{ marginTop: 6 }}>Installed — you&apos;re using the home-screen app. It works offline at the gym.</p>
+          ) : installer.canInstall ? (
+            <>
+              <p style={{ marginTop: 6 }}>Add it to your home screen: full screen, its own icon, and it works offline.</p>
+              <button className={`${styles.btn} ${styles.btnPrimary}`} style={{ marginTop: 10 }} onClick={installer.install}>
+                Install app
+              </button>
+            </>
+          ) : isIOS() ? (
+            <ol className={styles.steps}>
+              <li>Open this page in Safari.</li>
+              <li>
+                Tap the <strong>Share</strong> button (square with an arrow).
+              </li>
+              <li>
+                Choose <strong>Add to Home Screen</strong>, then <strong>Add</strong>.
+              </li>
+            </ol>
+          ) : (
+            <ol className={styles.steps}>
+              <li>Open this page in Chrome.</li>
+              <li>
+                Tap the <strong>⋮</strong> menu.
+              </li>
+              <li>
+                Choose <strong>Add to Home screen</strong> or <strong>Install app</strong>.
+              </li>
+            </ol>
+          )}
+        </section>
+      )}
 
       <section className={styles.card}>
         <div className={styles.label}>Units</div>
@@ -259,8 +275,9 @@ export default function SettingsView({ state, update, reset, installer }) {
       <section className={styles.card}>
         <div className={styles.label}>Your data</div>
         <p style={{ marginTop: 6 }}>
-          Everything is saved in this browser only. Export a backup now and then, especially before clearing your browser or switching
-          phones.
+          {IS_ARTIFACT
+            ? "Your log is saved privately to your Claude account and syncs to every device where you open Sculpt. Only you can see it."
+            : "Everything is saved in this browser only. Export a backup now and then, especially before clearing your browser or switching phones."}
         </p>
         <div className={styles.row} style={{ marginTop: 10 }}>
           <button className={styles.btn} onClick={exportData}>

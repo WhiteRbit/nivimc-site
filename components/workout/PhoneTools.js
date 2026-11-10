@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { IS_ARTIFACT } from "@/lib/workout/env";
 import styles from "./workout.module.css";
 
 // ------------------------------------------------------------ Rest timer
@@ -178,7 +179,8 @@ export function useUpdateCheck() {
   const [available, setAvailable] = useState(false);
 
   useEffect(() => {
-    if (process.env.NODE_ENV !== "production") return;
+    // The Claude artifact updates itself when republished; only the website needs this check.
+    if (process.env.NODE_ENV !== "production" || IS_ARTIFACT) return;
     let last = 0;
     const check = async () => {
       if (document.visibilityState !== "visible" || Date.now() - last < 60000) return;

@@ -1,0 +1,21 @@
+<title>Sculpt</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap">
+<style>
+  /* Sculpt is deliberately dark-only: near-black ground, rose accent (tokens in sculpt.css). */
+  :root {
+    --font-jakarta: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --ground: #000000;
+    --ink: #f5f5f5;
+    color-scheme: dark;
+  }
+  html, body { background: var(--ground); color: var(--ink); }
+  body { font-family: var(--font-jakarta); -webkit-text-size-adjust: 100%; }
+  /* The page skeleton already pads for the phone's top inset. */
+  #workout-app { padding-top: 16px; }
+  .loading { padding: 32px 16px; color: #a3a3a3; font-family: var(--font-jakarta); }
+</style>
+<link rel="stylesheet" href="sculpt.css">
+<div id="root"><p class="loading">Loading Sculpt…</p></div>
+<script src="sculpt.js"></script>

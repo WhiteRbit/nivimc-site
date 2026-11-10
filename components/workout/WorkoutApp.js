@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import styles from "./workout.module.css";
 import TodayView from "./TodayView";
 import WeekView from "./WeekView";
@@ -13,6 +13,7 @@ import {
   DEFAULT_PLAN,
   DEFAULT_SETTINGS,
   PLAN_VERSION,
+  convertUnits,
   isBikini,
   isProgressive,
   migratePlan,
@@ -23,6 +24,16 @@ import {
 } from "@/lib/workout/program";
 import { phaseOf, weekOf, yearOf } from "@/lib/workout/bikini";
 import { registerCustom } from "@/lib/workout/exercises";
+import { IS_ARTIFACT } from "@/lib/workout/env";
+import { applyDocs, connectCloud, legacyFromDocs } from "@/lib/workout/cloud";
+
+// What the sync line says in the artifact; nothing is shown while things are fine.
+const CLOUD_NOTES = {
+  slow: "Can't reach your saved workouts yet. What you log now saves when it reconnects.",
+  error: "Saving stopped. Reopen Sculpt to reconnect.",
+  local: "Saving on this device only. Open Sculpt signed in to Claude to sync your log.",
+  full: "Your storage is full, so new days can't be saved.",
+};
 
 const STORAGE_KEY = "nivimc-workout-v1";
 
@@ -78,17 +89,61 @@ export default function WorkoutApp() {
   const updateAvailable = useUpdateCheck();
   registerCustom(state.custom); // idempotent: makes added exercises visible everywhere
 
+  // Claude artifact: the log lives in the viewer's private database space and syncs
+  // across devices. Until the first confirmed read nothing is written, so an old copy on
+  // this device never overwrites newer data.
+  const cloudRef = useRef(null);
+  const cloudReady = useRef(false);
+  const [cloudStatus, setCloudStatus] = useState(null);
+  const latest = useRef(state); // newest state, for the first save once connected
+  useEffect(() => {
+    if (!IS_ARTIFACT) return;
+    let stopped = false;
+    connectCloud({
+      onStatus: setCloudStatus,
+      onDocs: (docs, { definitive, pending }) => {
+        const first = definitive && !cloudReady.current;
+        if (first) cloudReady.current = true;
+        setState((s) => {
+          const next = applyDocs(s, docs, pending);
+          if (!first || docs.sculpt) return next;
+          // First sync: keep this device's log and bring in the old Bikini Pro Training log.
+          const legacy = legacyFromDocs(docs, next.custom ?? []);
+          // The old app logged in lb, so switch to lb when its log comes in.
+          const base = Object.keys(legacy.logs).length && next.settings.units !== "lb" ? convertUnits(next, "lb") : next;
+          return {
+            ...base,
+            logs: { ...legacy.logs, ...base.logs },
+            custom: legacy.custom,
+            milestones: { ...legacy.milestones, ...base.milestones },
+          };
+        });
+      },
+    }).then((cloud) => {
+      if (stopped) return cloud?.stop();
+      cloudRef.current = cloud;
+      if (!cloud) setCloudStatus("local");
+      else if (cloudReady.current) cloud.save(latest.current);
+    });
+    return () => {
+      stopped = true;
+      cloudRef.current?.stop();
+    };
+  }, []);
+
   useEffect(() => {
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch {
       // storage full or blocked — the session still works in memory
     }
+    latest.current = state;
+    if (cloudReady.current) cloudRef.current?.save(state);
   }, [state]);
 
-  // Offline support for the installed app (production builds only).
+  // Offline support for the installed app (website production builds only).
   useEffect(() => {
-    if (process.env.NODE_ENV !== "production" || !("serviceWorker" in navigator)) return;
+    if (IS_ARTIFACT || process.env.NODE_ENV !== "production" || !("serviceWorker" in navigator)) return;
     navigator.serviceWorker.register("/workout-sw.js", { scope: "/workout" }).catch(() => {});
   }, []);
 
@@ -133,6 +188,12 @@ export default function WorkoutApp() {
           )}
         </div>
       </header>
+
+      {CLOUD_NOTES[cloudStatus] && (
+        <p className={styles.notice} role="status" style={{ marginBottom: 10 }}>
+          {CLOUD_NOTES[cloudStatus]}
+        </p>
+      )}
 
       {updateAvailable && (
         <button
