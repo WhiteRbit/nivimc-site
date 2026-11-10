@@ -2,7 +2,7 @@
 // Pages: network first, falling back to the cached copy so the app opens offline.
 // Build assets, icons and exercise photos: cache first (they never change in place).
 
-const CACHE = "workout-v2";
+const CACHE = "workout-v3"; // v3: Sculpt icons and rose theme
 const SHELL = [
   "/workout",
   "/workout.webmanifest",

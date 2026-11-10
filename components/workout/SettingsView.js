@@ -44,17 +44,43 @@ export default function SettingsView({ state, update, reset, installer }) {
     URL.revokeObjectURL(url);
   };
 
+  // Merges a backup (or a log exported from another app): new days are added; on a day that
+  // exists in both, exercises only in the file are added and logged sets here are never
+  // overwritten. Weights are converted if the file uses other units.
   const importData = async (file) => {
     try {
       const data = JSON.parse(await file.text());
-      if (!data || typeof data !== "object" || !data.logs || !data.plan) throw new Error("bad file");
+      if (!data || typeof data !== "object" || !data.logs) throw new Error("bad file");
+      const fileUnits = data.settings?.units ?? data.units ?? settings.units;
+      const incoming = convertUnits({ settings: { ...settings, units: fileUnits }, logs: data.logs }, settings.units).logs;
+      const added = Object.keys(incoming).filter((k) => !state.logs[k]);
+      const merged = Object.keys(incoming).filter((k) => state.logs[k]);
+      const hasDone = (e) => e?.sets?.some((x) => x.done);
+      const mergeDay = (mine, theirs) => {
+        const exercises = (mine.exercises ?? []).map((e) => {
+          const other = (theirs.exercises ?? []).find((x) => x.exId === e.exId);
+          return !hasDone(e) && hasDone(other) ? other : e;
+        });
+        for (const e of theirs.exercises ?? []) if (!exercises.some((x) => x.exId === e.exId)) exercises.push(e);
+        return { ...mine, exercises, title: mine.title ?? theirs.title, notes: mine.notes || theirs.notes || "" };
+      };
       update((s) => ({
+        ...s,
         version: PLAN_VERSION,
-        settings: { ...s.settings, ...data.settings },
-        plan: migratePlan(data.plan, data.version ?? 1),
-        logs: data.logs,
+        settings: s.settings.lowerNote || !data.settings?.lowerNote ? s.settings : { ...s.settings, lowerNote: data.settings.lowerNote },
+        plan: data.plan && Object.keys(s.logs).length === 0 ? migratePlan(data.plan, data.version ?? 1) : s.plan,
+        logs: {
+          ...incoming,
+          ...Object.fromEntries(Object.entries(s.logs).map(([k, d]) => [k, incoming[k] ? mergeDay(d, incoming[k]) : d])),
+        },
+        custom: [...(s.custom ?? []), ...(data.custom ?? []).filter((c) => !(s.custom ?? []).some((x) => x.id === c.id))],
+        milestones: { ...(data.milestones ?? {}), ...(s.milestones ?? {}) },
       }));
-      setMsg("Backup restored.");
+      const parts = [
+        added.length && `added ${added.length} day${added.length > 1 ? "s" : ""}`,
+        merged.length && `merged ${merged.length} existing day${merged.length > 1 ? "s" : ""}`,
+      ].filter(Boolean);
+      setMsg(parts.length ? `Imported: ${parts.join(", ")}. Sets you'd already logged were kept.` : "That file had no workouts in it.");
     } catch {
       setMsg("That file doesn't look like a workout backup.");
     }
@@ -79,6 +105,16 @@ export default function SettingsView({ state, update, reset, installer }) {
         </div>
         <p style={{ marginTop: 8 }}>{TRAINING_MODES.find((m) => m.id === (progressive ? "progressive" : "daily")).blurb}</p>
         <p style={{ marginTop: 6 }}>You can switch any time; your history stays and the next targets adjust.</p>
+        <label className={styles.exMeta} style={{ display: "block", marginTop: 12 }}>
+          Reminder on lower-body days (e.g. an injury cue)
+          <input
+            className={styles.input}
+            style={{ width: "100%", marginTop: 4 }}
+            value={settings.lowerNote ?? ""}
+            placeholder="Optional"
+            onChange={(e) => set("lowerNote", e.target.value.slice(0, 200))}
+          />
+        </label>
       </section>
 
       <section className={styles.card}>

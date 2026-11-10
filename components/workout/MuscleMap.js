@@ -51,7 +51,7 @@ const BACK_BASE = [
 
 const BASE_FILL = "rgba(255,255,255,0.10)";
 const MUSCLE_FILL = "rgba(255,255,255,0.16)";
-const ACCENT = "#ff5a36";
+const ACCENT = "#db5585";
 const MIRROR = "translate(120,0) scale(-1,1)";
 
 // Fill for one region: either primary/secondary highlighting or a heat level 0–4.

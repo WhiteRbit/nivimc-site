@@ -1,4 +1,4 @@
-/* Workout tracker — dark theme matching the site, mobile first */
+/* Sculpt — dark theme with a rose accent, mobile first */
 
 .app {
   --line: rgba(255, 255, 255, 0.1);
@@ -6,8 +6,8 @@
   --panel-2: rgba(255, 255, 255, 0.08);
   --text: #f5f5f5;
   --muted: #a3a3a3;
-  --accent: #ff5a36;
-  --accent-soft: rgba(255, 90, 54, 0.14);
+  --accent: #db5585;
+  --accent-soft: rgba(219, 85, 133, 0.15);
   --ok: #3ddc84;
   --ok-soft: rgba(61, 220, 132, 0.14);
 
@@ -501,7 +501,7 @@
 }
 
 .today {
-  border-color: rgba(255, 90, 54, 0.45);
+  border-color: rgba(219, 85, 133, 0.45);
 }
 
 /* Week editor rows: name on its own line on phones */
@@ -599,7 +599,7 @@
   z-index: 70;
   overflow: hidden;
   border-radius: 16px;
-  border: 1px solid rgba(255, 90, 54, 0.5);
+  border: 1px solid rgba(219, 85, 133, 0.5);
   background: #161616;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
 }
@@ -1007,4 +1007,75 @@
 
 .segment > * {
   flex: 1;
+}
+
+/* ---------------------------------------------------------------- Plan (Bikini Pro) */
+
+.notice {
+  margin-top: 8px !important;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--text) !important;
+  font-size: 0.82rem !important;
+}
+
+.macroGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.macro {
+  padding: 8px 4px;
+  border-radius: 10px;
+  background: var(--panel-2);
+  text-align: center;
+}
+
+.macroValue {
+  font-weight: 700;
+  font-size: 0.85rem;
+  line-height: 1.2;
+}
+
+.more {
+  margin-top: 10px;
+}
+
+.more > summary,
+.phaseRow summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent);
+  list-style: none;
+  padding: 4px 0;
+}
+
+.phaseRow summary {
+  color: var(--text);
+}
+
+.more > summary::-webkit-details-marker,
+.phaseRow summary::-webkit-details-marker {
+  display: none;
+}
+
+.phaseRow {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.phaseRow:last-child {
+  border-bottom: 0;
+}
+
+.bullets {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
 }

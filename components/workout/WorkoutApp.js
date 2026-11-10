@@ -7,23 +7,31 @@ import WeekView from "./WeekView";
 import ProgressView from "./ProgressView";
 import LibraryView from "./LibraryView";
 import SettingsView from "./SettingsView";
+import PlanView from "./PlanView";
 import { RestTimer, useInstallPrompt, useRestTimer, useUpdateCheck, useWakeLock } from "./PhoneTools";
 import {
   DEFAULT_PLAN,
   DEFAULT_SETTINGS,
   PLAN_VERSION,
+  isBikini,
   isProgressive,
   migratePlan,
+  migrateSettings,
   squatStreak,
   toKey,
   workoutsThisWeek,
 } from "@/lib/workout/program";
+import { phaseOf, weekOf, yearOf } from "@/lib/workout/bikini";
+import { registerCustom } from "@/lib/workout/exercises";
 
 const STORAGE_KEY = "nivimc-workout-v1";
 
-const TABS = [
+export const APP_NAME = "Sculpt";
+
+// The Bikini Pro plan shows its own Plan tab; the other programs keep the editable Week.
+const tabsFor = (bikini) => [
   { id: "today", label: "Today" },
-  { id: "week", label: "Week" },
+  bikini ? { id: "plan", label: "Plan" } : { id: "week", label: "Week" },
   { id: "progress", label: "Progress" },
   { id: "library", label: "Library" },
   { id: "settings", label: "Settings" },
@@ -35,6 +43,8 @@ function freshState() {
     settings: { ...DEFAULT_SETTINGS },
     plan: JSON.parse(JSON.stringify(DEFAULT_PLAN)),
     logs: {},
+    custom: [], // exercises added by name
+    milestones: {}, // Bikini Pro checkpoints ticked off
   };
 }
 
@@ -46,9 +56,11 @@ function loadState() {
     const base = freshState();
     return {
       version: PLAN_VERSION,
-      settings: { ...base.settings, ...saved.settings },
+      settings: migrateSettings({ ...base.settings, ...saved.settings }, saved.version ?? 1),
       plan: saved.plan ? migratePlan(saved.plan, saved.version ?? 1) : base.plan,
       logs: saved.logs || {},
+      custom: saved.custom || [],
+      milestones: saved.milestones || {},
     };
   } catch {
     return freshState();
@@ -64,6 +76,7 @@ export default function WorkoutApp() {
   const wake = useWakeLock();
   const installer = useInstallPrompt();
   const updateAvailable = useUpdateCheck();
+  registerCustom(state.custom); // idempotent: makes added exercises visible everywhere
 
   useEffect(() => {
     try {
@@ -82,9 +95,11 @@ export default function WorkoutApp() {
   const update = useCallback((fn) => setState((s) => fn(s)), []);
   const onSetDone = (seconds) => startRest(seconds ?? state.settings.restSeconds);
 
-  const progressive = isProgressive(state.settings);
-  // Squat every day counts the streak; progressive overload counts sessions this week.
-  const streak = progressive ? workoutsThisWeek(state.logs, todayKey) : squatStreak(state.logs, todayKey);
+  const bikini = isBikini(state.settings);
+  const perWeek = bikini || isProgressive(state.settings);
+  // Squat every day counts the streak; the other programs count sessions this week.
+  const streak = perWeek ? workoutsThisWeek(state.logs, todayKey) : squatStreak(state.logs, todayKey);
+  const visibleTab = tab === "plan" && !bikini ? "week" : tab === "week" && bikini ? "plan" : tab;
   const openDay = (key) => {
     setDateKey(key);
     setTab("today");
@@ -93,10 +108,17 @@ export default function WorkoutApp() {
   return (
     <div className={styles.app} id="workout-app">
       <header className={styles.header}>
-        <h1 className={styles.title}>{progressive ? "Progressive Overload" : "Squat Every Day"}</h1>
+        <div className={styles.grow}>
+          <h1 className={styles.title}>{APP_NAME}</h1>
+          {bikini && (
+            <div className={styles.exMeta}>
+              {phaseOf(todayKey).name} · Year {yearOf(todayKey)} · Week {weekOf(todayKey)}
+            </div>
+          )}
+        </div>
         <div className={styles.row} style={{ gap: 6, flexWrap: "nowrap" }}>
-          <span className={styles.pill} title={progressive ? "Workouts this week" : "Day squat streak"}>
-            {progressive ? `${streak} this week` : `🔥 ${streak}`}
+          <span className={styles.pill} title={perWeek ? "Workouts this week" : "Day squat streak"}>
+            {perWeek ? `${streak} this week` : `🔥 ${streak}`}
           </span>
           {wake.supported && (
             <button
@@ -123,25 +145,28 @@ export default function WorkoutApp() {
       )}
 
       <nav className={styles.tabs} aria-label="Sections">
-        {TABS.map((t) => (
+        {tabsFor(bikini).map((t) => (
           <button
             key={t.id}
-            className={`${styles.tab} ${tab === t.id ? styles.tabActive : ""}`}
+            className={`${styles.tab} ${visibleTab === t.id ? styles.tabActive : ""}`}
             onClick={() => setTab(t.id)}
-            aria-current={tab === t.id ? "page" : undefined}
+            aria-current={visibleTab === t.id ? "page" : undefined}
           >
             {t.label}
           </button>
         ))}
       </nav>
 
-      {tab === "today" && (
+      {visibleTab === "today" && (
         <TodayView state={state} update={update} dateKey={dateKey} setDateKey={setDateKey} todayKey={todayKey} onSetDone={onSetDone} />
       )}
-      {tab === "week" && <WeekView state={state} update={update} todayKey={todayKey} openDay={openDay} />}
-      {tab === "progress" && <ProgressView state={state} openDay={openDay} />}
-      {tab === "library" && <LibraryView state={state} update={update} />}
-      {tab === "settings" && <SettingsView state={state} update={update} reset={() => setState(freshState())} installer={installer} />}
+      {visibleTab === "plan" && <PlanView state={state} todayKey={todayKey} openDay={openDay} />}
+      {visibleTab === "week" && <WeekView state={state} update={update} todayKey={todayKey} openDay={openDay} />}
+      {visibleTab === "progress" && <ProgressView state={state} update={update} openDay={openDay} />}
+      {visibleTab === "library" && <LibraryView state={state} update={update} />}
+      {visibleTab === "settings" && (
+        <SettingsView state={state} update={update} reset={() => setState(freshState())} installer={installer} />
+      )}
 
       {rest && <RestTimer key={rest.endsAt - rest.total * 1000} rest={rest} setRest={setRest} audioRef={audioRef} />}
     </div>

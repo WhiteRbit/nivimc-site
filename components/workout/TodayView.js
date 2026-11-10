@@ -11,8 +11,8 @@ import SessionSummary from "./SessionSummary";
 import WorkoutTime from "./WorkoutTime";
 import PlanStep from "./PlanStep";
 import LiftBlock, { liftSkipped } from "./LiftBlock";
-import { EXERCISE_BY_ID } from "@/lib/workout/exercises";
-import { DAY_NAMES, LIFTS, accessoryTarget, fromKey, isProgressive, shiftDate, weekdayOf } from "@/lib/workout/program";
+import { EXERCISE_BY_ID, customId } from "@/lib/workout/exercises";
+import { DAY_NAMES, LIFTS, accessoryTarget, fromKey, isBikini, isProgressive, shiftDate, weekdayOf } from "@/lib/workout/program";
 import { lastPerformance, newSet, postponeExercises, snapshotFromWeekday, viewDay, withDay } from "@/lib/workout/log";
 
 const STEPS = [
@@ -107,6 +107,13 @@ export default function TodayView({ state, update, dateKey, setDateKey, todayKey
           edit={edit}
           planned={planDay}
           onUseRoutine={() => setChoosing(true)}
+          addCustom={(name) => {
+            const id = customId(name);
+            update((s) =>
+              s.custom?.some((c) => c.id === id) ? s : { ...s, custom: [...(s.custom ?? []), { id, name: name.trim().slice(0, 80) }] },
+            );
+            return id;
+          }}
           onStart={() => window.scrollTo({ top: 0 })}
         />
       )}
@@ -205,7 +212,7 @@ function WorkoutStep({ state, update, day, dateKey, edit, onSetDone, goTo }) {
           count={day.exercises.length}
           units={units}
           last={lastPerformance(state.logs, ex.exId, dateKey)}
-          progressive={isProgressive(state.settings)}
+          progressive={isProgressive(state.settings) || isBikini(state.settings)}
           settings={state.settings}
           edit={edit}
           onMove={(by) => move(index, by)}
@@ -309,12 +316,18 @@ function ExerciseCard({
   const info = EXERCISE_BY_ID[ex.exId];
   const allDone = ex.sets.length > 0 && ex.sets.every((s) => s.done);
   // Progressive overload: next step from last time (more weight once every set hits the top reps).
-  const next = progressive ? accessoryTarget(last, ex.targetReps, settings) : null;
+  const assisted = Boolean(info?.assisted);
+  const next = progressive ? accessoryTarget(last, ex.targetReps, settings, assisted) : null;
 
   const writeSet = (i, fn) => edit((d) => (d.exercises[index].sets[i] = fn(d.exercises[index].sets[i])));
 
   const lastText = last ? last.sets.map((s) => `${s.weight || "BW"}×${s.reps || "?"}`).join(", ") : null;
-  const meta = [`${ex.targetSets} × ${ex.targetReps}`, lastText && `last ${lastText}`, ex.carriedFrom && `from ${dayLabel(ex.carriedFrom)}`]
+  const meta = [
+    `${ex.targetSets} × ${ex.targetReps}`,
+    ex.note,
+    lastText && `last ${lastText}`,
+    ex.carriedFrom && `from ${dayLabel(ex.carriedFrom)}`,
+  ]
     .filter(Boolean)
     .join(" · ");
 
@@ -348,6 +361,7 @@ function ExerciseCard({
       <SetTable
         sets={ex.sets}
         units={units}
+        weightLabel={assisted ? `Assist ${units}` : undefined}
         placeholder={(i) => ({
           weight: next?.weight || last?.sets[i]?.weight || last?.sets[last.sets.length - 1]?.weight || null,
           reps: ex.targetReps,
