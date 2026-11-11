@@ -4,13 +4,13 @@ import styles from "./workout.module.css";
 
 // Editable rows of weight × reps with a done check.
 // Blank cells show `placeholder(i)` and get filled with it when the set is checked off.
-export default function SetTable({ sets, units, placeholder, onChange, onToggle, labelFor }) {
+export default function SetTable({ sets, units, weightLabel, placeholder, onChange, onToggle, labelFor }) {
   return (
     <table className={styles.sets}>
       <thead>
         <tr>
           <th>Set</th>
-          <th>{units}</th>
+          <th>{weightLabel ?? units}</th>
           <th>Reps</th>
           <th aria-label="Done" />
         </tr>

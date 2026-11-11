@@ -6,6 +6,7 @@ import HowTo from "./HowTo";
 import { EXERCISE_BY_ID } from "@/lib/workout/exercises";
 import {
   DAY_NAMES,
+  isBikini,
   isProgressive,
   liftDays,
   lightWeight,
@@ -41,6 +42,8 @@ export function liftPlan(state, day, dateKey, lift) {
 // overload), or the deadlift turned off (squat every day).
 export function liftSkipped(state, day, lift, dateKey) {
   const { settings } = state;
+  // Bikini Pro plan: the pyramids are optional add-ons, off until added for the day.
+  if (isBikini(settings)) return day[lift.key]?.skip ?? true;
   if (isProgressive(settings)) return day[lift.key]?.skip ?? !liftDays(settings, lift.key).includes(weekdayOf(dateKey));
   if (lift.key !== "deadlift") return false;
   return day.deadlift.skip ?? settings.dailyDeadlift === false;
@@ -95,7 +98,14 @@ export default function LiftBlock({ state, day, dateKey, lift, edit, onSetDone }
         labelFor={(i) => (!isLight && !progressive && i === lastIndex ? "Top" : i + 1)}
         onChange={(i, field, value) => writeSet(i, (s) => ({ ...s, [field]: value }))}
         onToggle={(i, ph) => {
-          if (!sets[i].done) onSetDone?.(state.settings.squatRestSeconds);
+          if (!sets[i].done) {
+            const open = sets.findIndex((s, k) => k !== i && !s.done);
+            const p = plan[open] ?? plan[lastIndex];
+            onSetDone?.(
+              state.settings.squatRestSeconds,
+              open >= 0 ? `${lift.name} · ${p.weight} ${units} × ${p.reps}` : `${lift.name} done · next exercise`,
+            );
+          }
           writeSet(i, (s) => toggleSet(s, ph));
         }}
       />

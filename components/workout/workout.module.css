@@ -1,4 +1,4 @@
-/* Workout tracker — dark theme matching the site, mobile first */
+/* Sculpt — dark theme with a rose accent, mobile first */
 
 .app {
   --line: rgba(255, 255, 255, 0.1);
@@ -6,8 +6,8 @@
   --panel-2: rgba(255, 255, 255, 0.08);
   --text: #f5f5f5;
   --muted: #a3a3a3;
-  --accent: #ff5a36;
-  --accent-soft: rgba(255, 90, 54, 0.14);
+  --accent: #db5585;
+  --accent-soft: rgba(219, 85, 133, 0.15);
   --ok: #3ddc84;
   --ok-soft: rgba(61, 220, 132, 0.14);
 
@@ -501,7 +501,7 @@
 }
 
 .today {
-  border-color: rgba(255, 90, 54, 0.45);
+  border-color: rgba(219, 85, 133, 0.45);
 }
 
 /* Week editor rows: name on its own line on phones */
@@ -589,50 +589,298 @@
 }
 
 /* Rest timer — floats above the site footer */
+/* ---------------------------------------------------------------- Rest timer */
+/* Floating card above the tab bar; colour follows the phase: rose → amber (last 10 s) → green. */
 .timer {
+  --phase: var(--accent);
+  --phase-glow: rgba(219, 85, 133, 0.35);
   position: fixed;
   left: 50%;
-  bottom: calc(env(safe-area-inset-bottom) + 64px);
+  bottom: calc(env(safe-area-inset-bottom) + 66px);
   transform: translateX(-50%);
   width: calc(100% - 24px);
   max-width: 560px;
   z-index: 70;
-  overflow: hidden;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 90, 54, 0.5);
-  background: #161616;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
-}
-
-.timerDone {
-  border-color: var(--ok);
-}
-
-.timerBar {
-  position: absolute;
-  inset: 0 auto 0 0;
-  background: var(--accent-soft);
-  transition: width 0.25s linear;
-}
-
-.timerDone .timerBar {
-  background: var(--ok-soft);
-}
-
-.timerBody {
-  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 14px;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: 26px;
+  /* Frosted glass: the workout shows through, blurred and brightened, tinted by the phase. */
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background:
+    linear-gradient(140deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.04) 45%, rgba(255, 255, 255, 0.08) 100%),
+    radial-gradient(120% 160% at 0% 50%, color-mix(in srgb, var(--phase) 30%, transparent) 0%, transparent 65%),
+    rgba(22, 22, 26, 0.38);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  backdrop-filter: blur(22px) saturate(180%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 0 0 1px color-mix(in srgb, var(--phase) 25%, transparent),
+    0 12px 40px rgba(0, 0, 0, 0.45),
+    0 0 30px var(--phase-glow);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  animation: timerIn 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  transition: box-shadow 0.4s, background 0.4s;
+  isolation: isolate;
+  overflow: hidden;
 }
 
-.timerNum {
-  font-size: 1.6rem;
+/* Specular highlight along the top edge, like light catching glass. */
+.timer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: radial-gradient(80% 50% at 30% 0%, rgba(255, 255, 255, 0.22), transparent 70%);
+  pointer-events: none;
+}
+
+/* Without blur support (or with reduced transparency) keep the card solid enough to read. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .timer {
+    background: radial-gradient(120% 140% at 0% 50%, color-mix(in srgb, var(--phase) 22%, #141414) 0%, #141414 60%);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .timer,
+  .timerBig {
+    background: #141414;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+.timer_soon {
+  --phase: #f2a93b;
+  --phase-glow: rgba(242, 169, 59, 0.35);
+}
+
+.timer_go {
+  --phase: var(--ok);
+  --phase-glow: rgba(61, 220, 132, 0.45);
+}
+
+@keyframes timerIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 24px) scale(0.96);
+  }
+}
+
+.timerPulse .ringNum {
+  animation: numPulse 1s ease-in-out infinite;
+}
+
+.timer_go .ringNum {
+  animation: numPop 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.4);
+}
+
+@keyframes numPulse {
+  50% {
+    transform: scale(1.12);
+  }
+}
+
+@keyframes numPop {
+  from {
+    transform: scale(0.6);
+  }
+}
+
+.ringBtn {
+  position: relative;
+  flex-shrink: 0;
+  width: 84px;
+  height: 84px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+
+.ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.ringTrack {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-width: 7;
+}
+
+.ringFill {
+  fill: none;
+  stroke: var(--phase);
+  stroke-width: 7;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 5px var(--phase-glow));
+  transition: stroke 0.4s;
+}
+
+.ringNum {
+  position: relative;
+  font-size: 1.45rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
-  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.timer_go .ringNum {
+  color: var(--ok);
+}
+
+.timerInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.timerTitle {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--phase);
+}
+
+.timerNext {
+  margin-top: 2px;
+  font-weight: 600;
+  font-size: 0.92rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.timerBtns {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.timerBtn {
+  min-height: 34px;
+  min-width: 48px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  text-shadow: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+.timerBtnMain {
+  margin-left: auto;
+  border-color: transparent;
+  background: var(--phase);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 4px 14px var(--phase-glow);
+  color: #111;
+}
+
+/* Full screen: readable from across the gym. Tap the ring again to shrink it. */
+.timerBig {
+  inset: 0;
+  left: 0;
+  bottom: 0;
+  transform: none;
+  width: auto;
+  max-width: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 28px;
+  padding: calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px);
+  border-radius: 0;
+  border: 0;
+  background:
+    radial-gradient(90% 60% at 50% 40%, color-mix(in srgb, var(--phase) 26%, transparent) 0%, transparent 70%),
+    rgba(10, 10, 12, 0.42);
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
+  backdrop-filter: blur(28px) saturate(170%);
+  box-shadow: none;
+  animation: none;
+  z-index: 90;
+}
+
+.timerBig::before {
+  background: radial-gradient(70% 35% at 50% 0%, rgba(255, 255, 255, 0.12), transparent 70%);
+}
+
+/* The ring itself becomes a glass disc in full screen. */
+.timerBig .ringBtn {
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 25%, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.03) 60%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 20px 60px rgba(0, 0, 0, 0.35),
+    0 0 50px var(--phase-glow);
+}
+
+.timerBig .ringBtn {
+  width: min(78vw, 360px);
+  height: min(78vw, 360px);
+}
+
+.timerBig .ringTrack,
+.timerBig .ringFill {
+  stroke-width: 5;
+}
+
+.timerBig .ringNum {
+  font-size: clamp(3.5rem, 20vw, 6rem);
+}
+
+.timerBig .timerInfo {
+  flex: none;
+  width: min(100%, 420px);
+  text-align: center;
+}
+
+.timerBig .timerTitle {
+  font-size: 0.9rem;
+}
+
+.timerBig .timerNext {
+  font-size: 1.15rem;
+  white-space: normal;
+}
+
+.timerBig .timerBtns {
+  justify-content: center;
+  margin-top: 18px;
+}
+
+.timerBig .timerBtn {
+  min-height: 48px;
+  min-width: 72px;
+  font-size: 1rem;
+}
+
+.timerBig .timerBtnMain {
+  margin-left: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .timer,
+  .timerPulse .ringNum,
+  .timer_go .ringNum {
+    animation: none;
+  }
 }
 
 /* Launched from the home screen: no site chrome, respect the notch */
@@ -640,9 +888,6 @@
   .app {
     padding-top: calc(env(safe-area-inset-top) + 16px);
     padding-bottom: calc(env(safe-area-inset-bottom) + 110px);
-  }
-  .timer {
-    bottom: calc(env(safe-area-inset-bottom) + 12px);
   }
 }
 
@@ -1007,4 +1252,75 @@
 
 .segment > * {
   flex: 1;
+}
+
+/* ---------------------------------------------------------------- Plan (Bikini Pro) */
+
+.notice {
+  margin-top: 8px !important;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  color: var(--text) !important;
+  font-size: 0.82rem !important;
+}
+
+.macroGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.macro {
+  padding: 8px 4px;
+  border-radius: 10px;
+  background: var(--panel-2);
+  text-align: center;
+}
+
+.macroValue {
+  font-weight: 700;
+  font-size: 0.85rem;
+  line-height: 1.2;
+}
+
+.more {
+  margin-top: 10px;
+}
+
+.more > summary,
+.phaseRow summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent);
+  list-style: none;
+  padding: 4px 0;
+}
+
+.phaseRow summary {
+  color: var(--text);
+}
+
+.more > summary::-webkit-details-marker,
+.phaseRow summary::-webkit-details-marker {
+  display: none;
+}
+
+.phaseRow {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.phaseRow:last-child {
+  border-bottom: 0;
+}
+
+.bullets {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
 }

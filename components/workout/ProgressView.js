@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import styles from "./workout.module.css";
-import { DAY_NAMES, fromKey, shiftDate, squatTop, toKey, weekdayOf } from "@/lib/workout/program";
+import { DAY_NAMES, fromKey, isBikini, shiftDate, squatTop, toKey, weekdayOf } from "@/lib/workout/program";
+import { MILESTONES } from "@/lib/workout/bikini";
 import { REGIONS, heatLevel as level, weeklyVolume } from "@/lib/workout/muscles";
 import MuscleMap, { HeatLegend } from "./MuscleMap";
 import { dayHasActivity } from "@/lib/workout/log";
@@ -11,9 +12,40 @@ import { EXERCISE_BY_ID } from "@/lib/workout/exercises";
 // Epley estimate of a one-rep max.
 const e1rm = (w, r) => Math.round(w * (1 + (Math.max(1, r) - 1) / 30));
 
-export default function ProgressView({ state, openDay }) {
+// Best set per day for one exercise: heaviest, or least assistance for assisted machines.
+function exercisePoints(logs, exId) {
+  const assisted = EXERCISE_BY_ID[exId]?.assisted;
+  return Object.keys(logs)
+    .sort()
+    .map((date) => {
+      const sets = (logs[date]?.exercises ?? [])
+        .filter((e) => e.exId === exId)
+        .flatMap((e) => e.sets)
+        .filter((x) => x.done && Number(x.weight) > 0);
+      if (!sets.length) return null;
+      const best = sets.reduce((a, b) => ((assisted ? Number(b.weight) < Number(a.weight) : Number(b.weight) > Number(a.weight)) ? b : a));
+      return { date, weight: Number(best.weight), reps: Number(best.reps) || 0 };
+    })
+    .filter(Boolean);
+}
+
+export default function ProgressView({ state, update, openDay }) {
   const { logs, settings, plan } = state;
   const units = settings.units;
+  const bikini = isBikini(settings);
+  const milestones = state.milestones ?? {};
+  // Exercises logged with a weight, most recent first.
+  const logged = [
+    ...new Set(
+      Object.keys(logs)
+        .sort()
+        .reverse()
+        .flatMap((k) => (logs[k]?.exercises ?? []).filter((e) => e.sets.some((x) => x.done && Number(x.weight) > 0)).map((e) => e.exId)),
+    ),
+  ];
+  const [chartEx, setChartEx] = useState(null);
+  const shownEx = logged.includes(chartEx) ? chartEx : logged.includes("hip-thrusts") ? "hip-thrusts" : logged[0];
+  const exPoints = shownEx ? exercisePoints(logs, shownEx) : [];
 
   const tops = Object.keys(logs)
     .sort()
@@ -22,7 +54,10 @@ export default function ProgressView({ state, openDay }) {
 
   const best = tops.reduce((m, t) => (t.weight > (m?.weight ?? 0) ? t : m), null);
   const bestE1rm = tops.reduce((m, t) => Math.max(m, e1rm(t.weight, t.reps)), 0);
-  const sessions = Object.keys(logs).filter((k) => dayHasActivity(logs[k])).sort().reverse();
+  const sessions = Object.keys(logs)
+    .filter((k) => dayHasActivity(logs[k]))
+    .sort()
+    .reverse();
 
   return (
     <div>
@@ -31,28 +66,113 @@ export default function ProgressView({ state, openDay }) {
           <div className={styles.label}>Sessions</div>
           <div className={styles.statNum}>{sessions.length}</div>
         </div>
-        <div className={styles.stat}>
-          <div className={styles.label}>Best top set</div>
-          <div className={styles.statNum}>{best ? `${best.weight}` : "–"}</div>
-          {best && <div className={styles.subtitle}>{units} × {best.reps}</div>}
-        </div>
-        <div className={styles.stat}>
-          <div className={styles.label}>Est. 1RM</div>
-          <div className={styles.statNum}>{bestE1rm || "–"}</div>
-          {bestE1rm > 0 && <div className={styles.subtitle}>{units} (Epley)</div>}
-        </div>
+        {bikini ? (
+          <>
+            <div className={styles.stat}>
+              <div className={styles.label}>Last 7 days</div>
+              <div className={styles.statNum}>{sessions.filter((k) => k > shiftDate(toKey(new Date()), -7)).length}</div>
+            </div>
+            <div className={styles.stat}>
+              <div className={styles.label}>Exercises</div>
+              <div className={styles.statNum}>{logged.length}</div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className={styles.stat}>
+              <div className={styles.label}>Best top set</div>
+              <div className={styles.statNum}>{best ? `${best.weight}` : "–"}</div>
+              {best && (
+                <div className={styles.subtitle}>
+                  {units} × {best.reps}
+                </div>
+              )}
+            </div>
+            <div className={styles.stat}>
+              <div className={styles.label}>Est. 1RM</div>
+              <div className={styles.statNum}>{bestE1rm || "–"}</div>
+              {bestE1rm > 0 && <div className={styles.subtitle}>{units} (Epley)</div>}
+            </div>
+          </>
+        )}
       </div>
+
+      {bikini && (
+        <section className={styles.card}>
+          <div className={styles.sectionHead}>
+            <span className={styles.sectionTitle}>Yearly checkpoints</span>
+            <span className={styles.exMeta}>
+              {MILESTONES.filter((m) => milestones[m.id]).length} of {MILESTONES.length}
+            </span>
+          </div>
+          <ul className={styles.list}>
+            {MILESTONES.map((m) => (
+              <li key={m.id} className={styles.exRow}>
+                <input
+                  type="checkbox"
+                  className={styles.bigCheck}
+                  checked={Boolean(milestones[m.id])}
+                  onChange={(e) => update((st) => ({ ...st, milestones: { ...(st.milestones ?? {}), [m.id]: e.target.checked } }))}
+                  aria-label={`Done: ${m.when}`}
+                />
+                <div className={styles.grow}>
+                  <div className={styles.exName}>{m.when}</div>
+                  <div className={styles.exMeta}>{m.strength}</div>
+                  <div className={styles.exMeta}>{m.other}</div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section className={styles.card}>
+        <span className={styles.sectionTitle}>Lift progress</span>
+        {!logged.length ? (
+          <p className={styles.empty}>Log a workout with weights and your progress line shows here.</p>
+        ) : (
+          <>
+            <select
+              className={styles.select}
+              style={{ width: "100%", marginTop: 8 }}
+              value={shownEx}
+              onChange={(e) => setChartEx(e.target.value)}
+              aria-label="Exercise"
+            >
+              {logged.map((id) => (
+                <option key={id} value={id}>
+                  {EXERCISE_BY_ID[id]?.name ?? id}
+                </option>
+              ))}
+            </select>
+            {exPoints.length < 2 ? (
+              <p className={styles.empty}>Log this exercise at least twice to see your progress line.</p>
+            ) : (
+              <>
+                <SquatChart points={exPoints.slice(-60)} units={units} label={EXERCISE_BY_ID[shownEx]?.name} />
+                <p className={styles.exMeta}>
+                  {EXERCISE_BY_ID[shownEx]?.assisted
+                    ? `Least assistance per session (lower is stronger): ${exPoints[0].weight} → ${exPoints.at(-1).weight} ${units}.`
+                    : `Heaviest set per session: ${exPoints[0].weight} → ${exPoints.at(-1).weight} ${units}.`}
+                </p>
+              </>
+            )}
+          </>
+        )}
+      </section>
 
       <WeeklyMuscles logs={logs} />
 
-      <section className={styles.card}>
-        <div className={styles.label}>Squat top set ({units})</div>
-        {tops.length < 2 ? (
-          <p className={styles.empty}>Log at least two heavy squat days to see your trend.</p>
-        ) : (
-          <SquatChart points={tops.slice(-60)} units={units} />
-        )}
-      </section>
+      {(!bikini || tops.length > 0) && (
+        <section className={styles.card}>
+          <div className={styles.label}>Squat top set ({units})</div>
+          {tops.length < 2 ? (
+            <p className={styles.empty}>Log at least two heavy squat days to see your trend.</p>
+          ) : (
+            <SquatChart points={tops.slice(-60)} units={units} label="Squat top set" />
+          )}
+        </section>
+      )}
 
       <section className={styles.card}>
         <div className={styles.label}>History</div>
@@ -72,11 +192,7 @@ export default function ProgressView({ state, openDay }) {
                   </div>
                   <div className={styles.muscles}>
                     Squat:{" "}
-                    {d.squat?.light
-                      ? "light day"
-                      : top
-                        ? `${top.weight} × ${top.reps || "?"}${top.rpe ? ` @ RPE ${top.rpe}` : ""}`
-                        : "—"}
+                    {d.squat?.light ? "light day" : top ? `${top.weight} × ${top.reps || "?"}${top.rpe ? ` @ RPE ${top.rpe}` : ""}` : "—"}
                     {doneSets > 0 && ` · ${doneSets} sets: ${lifts.join(", ")}`}
                   </div>
                 </div>
@@ -112,9 +228,7 @@ function WeeklyMuscles({ logs }) {
       <div style={{ marginTop: 8 }}>
         <HeatLegend />
       </div>
-      {missed.length > 0 && missed.length < ranked.length && (
-        <p style={{ marginTop: 8 }}>Not hit this week: {missed.join(", ")}.</p>
-      )}
+      {missed.length > 0 && missed.length < ranked.length && <p style={{ marginTop: 8 }}>Not hit this week: {missed.join(", ")}.</p>}
       <ul className={styles.list} style={{ marginTop: 8 }}>
         {ranked
           .filter(([, v]) => v > 0)
@@ -131,7 +245,7 @@ function WeeklyMuscles({ logs }) {
   );
 }
 
-function SquatChart({ points, units }) {
+function SquatChart({ points, units, label }) {
   const [hover, setHover] = useState(null);
   const W = 640;
   const H = 220;
@@ -160,7 +274,7 @@ function SquatChart({ points, units }) {
         viewBox={`0 0 ${W} ${H}`}
         className={styles.chart}
         role="img"
-        aria-label={`Squat top set from ${points[0].weight} to ${points[points.length - 1].weight} ${units}`}
+        aria-label={`${label}: ${points[0].weight} to ${points[points.length - 1].weight} ${units}`}
         onPointerMove={onMove}
         onPointerLeave={() => setHover(null)}
         style={{ touchAction: "pan-y" }}
@@ -180,17 +294,9 @@ function SquatChart({ points, units }) {
           {fmt(points[points.length - 1].date)}
         </text>
         {h && <line x1={x(hover)} x2={x(hover)} y1={pad.t} y2={H - pad.b} stroke="rgba(255,255,255,0.25)" strokeWidth="1" />}
-        <path d={path} fill="none" stroke="#ff5a36" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+        <path d={path} fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
         {points.map((p, i) => (
-          <circle
-            key={p.date}
-            cx={x(i)}
-            cy={y(p.weight)}
-            r={hover === i ? 5 : 4}
-            fill="#ff5a36"
-            stroke="#0b0b0b"
-            strokeWidth="2"
-          />
+          <circle key={p.date} cx={x(i)} cy={y(p.weight)} r={hover === i ? 5 : 4} fill="var(--accent)" stroke="#0b0b0b" strokeWidth="2" />
         ))}
       </svg>
       {h && (

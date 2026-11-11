@@ -1,12 +1,12 @@
 import WorkoutApp from "@/components/workout/WorkoutLoader";
 
 export const metadata = {
-  title: "Squat Every Day — Workout Tracker",
-  description: "Daily workout tracker with routines from Strength Training Anatomy and a back squat every day.",
+  title: "Sculpt",
+  description: "Bikini Pro training plan, workout tracker and progress, with Strength Training Anatomy exercises.",
   manifest: "/workout.webmanifest",
   appleWebApp: {
     capable: true,
-    title: "Squat Daily",
+    title: "Sculpt",
     statusBarStyle: "black-translucent",
   },
   icons: {

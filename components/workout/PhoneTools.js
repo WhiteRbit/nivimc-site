@@ -1,34 +1,37 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { IS_ARTIFACT } from "@/lib/workout/env";
 import styles from "./workout.module.css";
 
 // ------------------------------------------------------------ Rest timer
 
 const fmt = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
-function beep(ctx) {
+// A short tone. `freq`/`length` vary it: soft ticks for 3-2-1, a two-note chime at the end.
+function beep(ctx, freq = 880, length = 0.5, volume = 0.25, delay = 0) {
   if (!ctx) return;
   try {
+    const at = ctx.currentTime + delay;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    osc.frequency.value = 880;
-    gain.gain.setValueAtTime(0.25, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(volume, at);
+    gain.gain.exponentialRampToValueAtTime(0.001, at + length);
     osc.connect(gain).connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.5);
+    osc.start(at);
+    osc.stop(at + length);
   } catch {
     // audio unavailable — the vibration and on-screen message still fire
   }
 }
 
-// Returns [rest, startRest, setRest]. Call startRest(seconds) from a tap so audio can unlock.
+// Returns [rest, startRest, setRest]. Call startRest(seconds, nextUp) from a tap so audio can unlock.
 export function useRestTimer() {
-  const [rest, setRest] = useState(null); // { endsAt, total }
+  const [rest, setRest] = useState(null); // { endsAt, total, next }
   const audioRef = useRef(null);
 
-  const startRest = (seconds) => {
+  const startRest = (seconds, next = null) => {
     const total = Number(seconds) || 0;
     if (total <= 0) return;
     try {
@@ -38,52 +41,103 @@ export function useRestTimer() {
     } catch {
       audioRef.current = null;
     }
-    setRest({ endsAt: Date.now() + total * 1000, total });
+    // A new rest opens full screen; if one is already running, keep the size the person chose.
+    setRest((r) => ({ endsAt: Date.now() + total * 1000, total, next, big: r?.big ?? true }));
   };
 
   return [rest, startRest, setRest, audioRef];
 }
 
+const RING_R = 44;
+const RING_C = 2 * Math.PI * RING_R;
+
+// Rest countdown: a ring that drains smoothly, shifts rose → amber (last 10 s) → green,
+// ticks at 3-2-1 and chimes at zero. Opens full screen; tap the ring to shrink it, tap again to enlarge.
 export function RestTimer({ rest, setRest, audioRef }) {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(t);
+    let frame;
+    const tick = () => {
+      setNow(Date.now());
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
   }, []);
 
-  const left = Math.max(0, Math.ceil((rest.endsAt - now) / 1000));
-  const finished = left === 0;
+  const msLeft = Math.max(0, rest.endsAt - now);
+  const left = Math.ceil(msLeft / 1000);
+  const finished = msLeft === 0;
+  const phase = finished ? "go" : left <= 10 ? "soon" : "rest";
+  const fraction = Math.min(1, msLeft / (rest.total * 1000));
+
+  // 3-2-1: a soft tick and a short buzz each second.
+  useEffect(() => {
+    if (left > 0 && left <= 3) {
+      beep(audioRef.current, 660, 0.12, 0.12);
+      navigator.vibrate?.(60);
+    }
+  }, [left, audioRef]);
 
   useEffect(() => {
     if (!finished) return;
     navigator.vibrate?.([200, 100, 200]);
-    beep(audioRef.current);
-    const t = setTimeout(() => setRest(null), 5000);
+    beep(audioRef.current, 880, 0.35);
+    beep(audioRef.current, 1320, 0.5, 0.25, 0.18);
+    const t = setTimeout(() => setRest(null), 6000);
     return () => clearTimeout(t);
   }, [finished, setRest, audioRef]);
 
-  const pct = Math.min(100, ((rest.total - left) / rest.total) * 100);
+  const adjust = (sec) =>
+    setRest((r) => {
+      const endsAt = Math.max(Date.now() + 1000, r.endsAt + sec * 1000);
+      return { ...r, endsAt, total: Math.max(r.total + sec, Math.ceil((endsAt - Date.now()) / 1000)) };
+    });
+  const toggleBig = () => setRest((r) => ({ ...r, big: !r.big }));
+
+  const ring = (
+    <button className={styles.ringBtn} onClick={toggleBig} aria-label={rest.big ? "Make the timer small" : "Make the timer full screen"}>
+      <svg viewBox="0 0 100 100" className={styles.ring} aria-hidden="true">
+        <circle cx="50" cy="50" r={RING_R} className={styles.ringTrack} />
+        <circle
+          cx="50"
+          cy="50"
+          r={RING_R}
+          className={styles.ringFill}
+          strokeDasharray={RING_C}
+          strokeDashoffset={RING_C * (1 - fraction)}
+          transform="rotate(-90 50 50)"
+        />
+      </svg>
+      <span className={styles.ringNum}>{finished ? "GO" : fmt(left)}</span>
+    </button>
+  );
 
   return (
-    <div className={`${styles.timer} ${finished ? styles.timerDone : ""}`} role="timer" aria-live="polite">
-      <div className={styles.timerBar} style={{ width: `${pct}%` }} />
-      <div className={styles.timerBody}>
-        <div>
-          <div className={styles.label}>{finished ? "Rest over" : "Rest"}</div>
-          <div className={styles.timerNum}>{finished ? "Next set" : fmt(left)}</div>
-        </div>
-        <div className={styles.row}>
+    <div
+      className={`${styles.timer} ${rest.big ? styles.timerBig : ""} ${styles["timer_" + phase]} ${left <= 3 && !finished ? styles.timerPulse : ""}`}
+      role="timer"
+      aria-live="polite"
+      aria-label={finished ? "Rest over" : `Rest: ${left} seconds left`}
+    >
+      {ring}
+      <div className={styles.timerInfo}>
+        <div className={styles.timerTitle}>{finished ? "Rest over · go!" : phase === "soon" ? "Get ready" : "Rest"}</div>
+        <div className={styles.timerNext}>{rest.next ? `Next: ${rest.next}` : `${fmt(rest.total)} rest`}</div>
+        <div className={styles.timerBtns}>
           {!finished && (
-            <button
-              className={styles.btn}
-              onClick={() => setRest((r) => ({ total: r.total + 30, endsAt: r.endsAt + 30000 }))}
-            >
-              +30s
-            </button>
+            <>
+              <button className={styles.timerBtn} onClick={() => adjust(-15)} aria-label="15 seconds less">
+                −15
+              </button>
+              <button className={styles.timerBtn} onClick={() => adjust(15)} aria-label="15 seconds more">
+                +15
+              </button>
+            </>
           )}
-          <button className={styles.btn} onClick={() => setRest(null)}>
-            {finished ? "OK" : "Skip"}
+          <button className={`${styles.timerBtn} ${styles.timerBtnMain}`} onClick={() => setRest(null)}>
+            {finished ? "Done" : "Skip"}
           </button>
         </div>
       </div>
@@ -178,7 +232,8 @@ export function useUpdateCheck() {
   const [available, setAvailable] = useState(false);
 
   useEffect(() => {
-    if (process.env.NODE_ENV !== "production") return;
+    // The Claude artifact updates itself when republished; only the website needs this check.
+    if (process.env.NODE_ENV !== "production" || IS_ARTIFACT) return;
     let last = 0;
     const check = async () => {
       if (document.visibilityState !== "visible" || Date.now() - last < 60000) return;
