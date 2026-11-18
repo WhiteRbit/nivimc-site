@@ -456,7 +456,7 @@
 .backdrop {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: 80; /* above the small rest timer (70), below the full-screen one (90) */
   background: rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: flex-end;
