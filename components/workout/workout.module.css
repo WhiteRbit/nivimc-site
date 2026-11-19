@@ -1228,6 +1228,17 @@
   z-index: 20;
   padding: 10px 0;
   background: linear-gradient(180deg, transparent, #000 35%);
+  transition: bottom 0.25s ease;
+}
+
+/* While the small rest timer floats above the tab bar, lift the main button above it
+   and leave room at the bottom of the page so nothing hides behind either. */
+.timerOn .stickyCta {
+  bottom: calc(env(safe-area-inset-bottom) + 184px);
+}
+
+.timerOn {
+  padding-bottom: calc(env(safe-area-inset-bottom) + 270px);
 }
 
 .orderBtns {

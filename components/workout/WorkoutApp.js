@@ -161,7 +161,7 @@ export default function WorkoutApp() {
   };
 
   return (
-    <div className={styles.app} id="workout-app">
+    <div className={`${styles.app} ${rest && !rest.big ? styles.timerOn : ""}`} id="workout-app">
       <header className={styles.header}>
         <div className={styles.grow}>
           <h1 className={styles.title}>{APP_NAME}</h1>
